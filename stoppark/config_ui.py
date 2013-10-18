@@ -33,8 +33,10 @@ class Config(QWidget):
             self.terminal_config.raise_()
         else:
             self.terminal_config = TerminalConfig()
-            self.terminal_config.showNormal()
-            self.terminal_config.closed.connect(self.setup_terminals_closed)
+            self.terminal_config.setModal(True)
+            self.terminal_config.exec_()
+            self.terminal_config = None
+            #self.terminal_config.closed.connect(self.setup_terminals_closed)
 
     def setup_terminals_closed(self):
         self.terminal_config = None
@@ -47,7 +49,7 @@ class Config(QWidget):
         self.ui.updateTerminals.setEnabled(False)
 
         def terminals_updated(ok):
-            message = u'выполнено успешно' if ok else u'не удалось'
+            message = u'успешно' if ok else u'не удалось'
             now = datetime.now().strftime('%y-%m-%d %H:%M:%S')
             self.ui.updateTerminalsResult.setText(u'Обновление %s (%s)' % (message, now))
 

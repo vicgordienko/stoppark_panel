@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from PyQt4 import uic
 from PyQt4.QtCore import pyqtSignal, Qt, QVariant, QSize, QEvent
-from PyQt4.QtGui import QWidget, QFont, QHeaderView, QStyledItemDelegate
+from PyQt4.QtGui import QDialog, QFont, QHeaderView, QStyledItemDelegate
 from PyQt4.QtGui import QApplication, QStyle, QStyleOptionViewItem
 from PyQt4.QtSql import QSqlDatabase, QSqlTableModel
 import u2py.config
@@ -83,11 +83,11 @@ class TerminalSqlTableModel(QSqlTableModel):
         return QSqlTableModel.setData(self, index, value, role)
 
 
-class TerminalConfig(QWidget):
+class TerminalConfig(QDialog):
     closed = pyqtSignal()
 
     def __init__(self, parent=None):
-        QWidget.__init__(self, parent)
+        QDialog.__init__(self, parent)
 
         self.ui = uic.loadUiType('terminal-config.ui')[0]()
         self.ui.setupUi(self)
@@ -117,6 +117,5 @@ class TerminalConfig(QWidget):
 
     def closeEvent(self, event):
         self.closed.emit()
-        QWidget.closeEvent(self, event)
 
 

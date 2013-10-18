@@ -1,16 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Form</class>
- <widget class="QWidget" name="Form">
-  <property name="windowModality">
-   <enum>Qt::ApplicationModal</enum>
-  </property>
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>617</width>
-    <height>360</height>
+    <width>646</width>
+    <height>313</height>
    </rect>
   </property>
   <property name="windowTitle">

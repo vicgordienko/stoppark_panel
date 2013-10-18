@@ -182,7 +182,7 @@ class TerminalDelegate(QStyledItemDelegate):
         editor.setGeometry(option.rect)
 
     def sizeHint(self, option, index):
-        return QSize(350, 80)
+        return QSize(320, 80)
 
 
 class Terminals(QWidget):
