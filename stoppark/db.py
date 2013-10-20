@@ -72,7 +72,7 @@ class DB(object):
     @measure
     def query(self, q):
         try:
-            s = socket.create_connection(self.addr)
+            s = socket.create_connection(self.addr, timeout=1)
             s.send(q)
             answer = s.recv(1024)
         except socket.error:
