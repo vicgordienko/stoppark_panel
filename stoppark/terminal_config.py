@@ -12,7 +12,6 @@ class CenteredCheckBoxDelegate(QStyledItemDelegate):
         QStyledItemDelegate.__init__(self, parent)
 
     def paint(self, painter, option, index):
-        #value = index.model().data(index, Qt.CheckStateRole)
         value = index.data().toBool()
 
         style = QApplication.style()
@@ -84,8 +83,6 @@ class TerminalSqlTableModel(QSqlTableModel):
 
 
 class TerminalConfig(QDialog):
-    closed = pyqtSignal()
-
     def __init__(self, parent=None):
         QDialog.__init__(self, parent)
 
@@ -114,8 +111,3 @@ class TerminalConfig(QDialog):
         self.model.submitAll()
         self.db.commit()
         self.close()
-
-    def closeEvent(self, event):
-        self.closed.emit()
-
-

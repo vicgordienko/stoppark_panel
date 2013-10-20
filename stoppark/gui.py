@@ -13,12 +13,15 @@ class Main(QWidget):
 
         self.ui.config.setup(self.ui.terminals, self.ui.payment)
 
-        self.setWindowFlags(Qt.CustomizeWindowHint)
+        #self.setWindowFlags(Qt.CustomizeWindowHint)
 
     def closeEvent(self, event):
         self.ui.terminals.closeEvent(event)
         self.ui.payment.closeEvent(event)
         self.ui.config.closeEvent(event)
+
+        return QWidget.closeEvent(self, event)
+
 
 if __name__ == '__main__':
     import sys

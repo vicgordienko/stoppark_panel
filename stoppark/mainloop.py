@@ -74,8 +74,9 @@ class Mainloop(QObject):
         self.thread.start()
 
     def stop(self):
-        self.queue.put(None)
-        self.thread.join()
+        if self.queue:
+            self.queue.put(None)
+            self.thread.join()
 
     def test_display(self):
         self.queue.put(lambda terminal: TerminalMessage('Добро пожаловать').set(terminal, 0xFF, 5))
