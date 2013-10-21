@@ -97,7 +97,7 @@
       </font>
      </property>
      <property name="currentIndex">
-      <number>2</number>
+      <number>0</number>
      </property>
      <widget class="Terminals" name="terminals">
       <attribute name="title">
@@ -132,7 +132,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="rifghtUp">
+      <widget class="QPushButton" name="rightUp">
        <property name="minimumSize">
         <size>
          <width>40</width>

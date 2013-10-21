@@ -21,7 +21,8 @@ class LocalDB(object):
     create table if not exists terminal (
         id integer primary key,
         title text,
-        display integer default 1
+        display integer default 1,
+        option text default ''
     );
     """
 
@@ -40,11 +41,22 @@ class LocalDB(object):
         return [row for row in cursor]
 
     def update_terminals(self, terminals):
-        for terminal_id, title in terminals:
-            c = self.conn.execute('update terminal set title = ? where id = ?', (title, terminal_id))
-            if c.rowcount == 0:
-                self.conn.execute('insert into terminal(id,title) values(?,?)', (terminal_id, title))
+        self.conn.executescript('''
+        create table terminal_remote (
+            id integer primary key,
+            title text
+        );''')
+        self.conn.executemany('insert into terminal_remote values(?,?)', terminals)
+        self.conn.executescript('''
+        delete from terminal where id not in (select id from terminal_remote);
+        insert into terminal(id,title) select id,title from terminal_remote where id not in (select id from terminal);
+        update terminal set title = (select title from terminal_remote where id = terminal.id);
+        drop table terminal_remote;
+        ''')
         self.conn.commit()
+
+    def get_terminals_id_by_option(self, option):
+        return [int(row[0]) for row in self.query('select id from terminal where option = "%s"' % (option,))]
 
     def get_terminals(self):
         return self.query('select id,title from terminal where display = 1')

@@ -29,8 +29,8 @@ class Mainloop(QObject):
     state = pyqtSignal(int, str)
     notify = pyqtSignal(str, str)
 
-    def __init__(self, devices):
-        super(Mainloop, self).__init__()
+    def __init__(self, devices, parent=None):
+        super(Mainloop, self).__init__(parent)
         self.queue = None
         self.db = DB(notify=lambda title, msg: self.notify.emit(title, msg))
         self.thread = None

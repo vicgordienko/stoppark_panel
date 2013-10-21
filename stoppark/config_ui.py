@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from PyQt4 import uic
+from PyQt4.QtCore import pyqtSignal
 from PyQt4.QtGui import QWidget
 from datetime import datetime
 from terminal_config import TerminalConfig
@@ -8,6 +9,8 @@ from flickcharm import FlickCharm
 
 class Config(QWidget):
     DATETIME_FORMAT = '%d-%m-%Y %H:%M:%S'
+
+    terminals_changed = pyqtSignal()
 
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
@@ -39,26 +42,19 @@ class Config(QWidget):
         self.terminal_config = TerminalConfig()
         self.terminal_config.setModal(True)
         self.terminal_config.exec_()
-
-    def setup_terminals_closed(self):
         self.terminal_config = None
+        self.terminals_changed.emit()
 
     def update_terminals_config(self):
         self.terminals.update_device_config()
         self.ui.updateConfigResult.setText(datetime.now().strftime(self.DATETIME_FORMAT))
 
+    def terminals_ready(self, ok):
+        message = u'успешно' if ok else u'не удалось'
+        now = datetime.now().strftime(self.DATETIME_FORMAT)
+        self.ui.updateTerminalsResult.setText(u'Обновление %s (%s)' % (message, now))
+        self.ui.updateTerminals.setEnabled(True)
+
     def update_terminals(self):
         self.ui.updateTerminals.setEnabled(False)
-
-        def terminals_updated(ok):
-            message = u'успешно' if ok else u'не удалось'
-            now = datetime.now().strftime(self.DATETIME_FORMAT)
-            self.ui.updateTerminalsResult.setText(u'Обновление %s (%s)' % (message, now))
-
-            self.ui.updateTerminals.setEnabled(True)
-        self.terminals.ready.connect(terminals_updated)
-        self.terminals.update_model()
-
-    def closeEvent(self, event):
-        if self.terminal_config:
-            self.terminal_config.close()
+        self.terminals_changed.emit()

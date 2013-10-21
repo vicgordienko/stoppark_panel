@@ -41,7 +41,6 @@ class MouseTapAndHoldGestureRecognizer(QGestureRecognizer):
         return (pos - self.position).manhattanLength() > 3
 
     def reset(self, state):
-        print 'reset'
         self.position = None
         self.timer.stop()
         self.timer = None
@@ -78,9 +77,9 @@ class TerminalWidget(QWidget):
         self.bt_open.clicked.connect(self.open)
         self.bt_close.clicked.connect(self.close)
 
-        self.tap_and_hold = MouseTapAndHoldGestureRecognizer()
-        self.tap_and_hold_type = QGestureRecognizer.registerRecognizer(self.tap_and_hold)
-        self.grabGesture(self.tap_and_hold_type)
+        #self.tap_and_hold = MouseTapAndHoldGestureRecognizer()
+        #self.tap_and_hold_type = QGestureRecognizer.registerRecognizer(self.tap_and_hold)
+        #self.grabGesture(self.tap_and_hold_type)
         self.grabGesture(Qt.TapAndHoldGesture)
 
     def update_config(self):
@@ -98,9 +97,9 @@ class TerminalWidget(QWidget):
             self.options_layout.itemAt(i).widget().setParent(None)
 
     def gesture_event(self, event):
-        if event.gestureType() == self.tap_and_hold_type:
-            self.init_config_layout()
-            return True
+        #if event.gestureType() == self.tap_and_hold_type:
+        #    self.init_config_layout()
+        #    return True
         if event.gestureType() == Qt.TapAndHoldGesture:
             self.init_config_layout()
             return True
@@ -182,7 +181,7 @@ class TerminalDelegate(QStyledItemDelegate):
         editor.setGeometry(option.rect)
 
     def sizeHint(self, option, index):
-        return QSize(320, 80)
+        return QSize(315, 80)
 
 
 class Terminals(QWidget):
@@ -211,18 +210,32 @@ class Terminals(QWidget):
         if self.mainloop:
             self.mainloop.update_config()
 
+    def terminal_open(self, addr):
+        if self.mainloop:
+            self.mainloop.terminal_open(addr)
+
+    def terminal_close(self, addr):
+        if self.mainloop:
+            self.mainloop.terminal_close(addr)
+
     def update_model(self):
         if self.mainloop:
+            self.mainloop.state.disconnect()
             self.mainloop.ready.disconnect()
             self.mainloop.notify.disconnect()
+
+            [self.ui.terminals.closePersistentEditor(self.model.index(row, 0))
+             for row in xrange(self.model.rowCount())]
             self.mainloop.stop()
+
+            self.mainloop = None
 
         titles = DB(notify=lambda title, msg: self.notifier.showMessage(title, msg)).get_terminals()
 
         self.model = QStandardItemModel(len(titles), 1)
         [self.model.setItem(i, QStandardItem(str(addr))) for i, addr in enumerate(titles.keys())]
 
-        self.mainloop = Mainloop(titles.keys())
+        self.mainloop = Mainloop(titles.keys(), parent=self)
         self.mainloop.ready.connect(lambda ok: self.on_mainloop_ready(ok, titles))
         self.mainloop.notify.connect(lambda title, msg: self.notifier.showMessage(title, msg))
         self.mainloop.start()
@@ -243,6 +256,6 @@ class Terminals(QWidget):
 
         self.ready.emit(ok)
 
-    def closeEvent(self, event):
+    def stop_mainloop(self):
         if self.mainloop:
             self.mainloop.stop()
