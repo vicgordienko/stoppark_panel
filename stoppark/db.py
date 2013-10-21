@@ -67,7 +67,7 @@ class DB(object):
 
     def __init__(self, host='10.0.2.247', port=101, notify=None):
         self.addr = (host, port)
-        self._free_places = None
+        self._free_places = (100, None)
         self._strings = [
             'ТОВ "КАРД-СIСТЕМС"',
             'м. Київ',
@@ -125,7 +125,7 @@ class DB(object):
 
     def get_free_places(self):
         now = measurement()
-        if self._free_places is None or self._free_places[1] - now > 5:
+        if self._free_places[1] is None or self._free_places[1] - now > 5:
             answer = self.query('select placefree from gstatus')
             try:
                 self._free_places = (int(answer[0][0]), now)
