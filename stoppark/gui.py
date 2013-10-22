@@ -51,7 +51,8 @@ class Main(QWidget):
         self.ui.leftUp.setEnabled(not not self.left_terminals)
         self.ui.leftDown.setEnabled(not not self.left_terminals)
 
-        self.right_terminals = self.db.get_terminals_id_by_option('right')
+        self.right_terminals = \
+            self.db.get_terminals_id_by_option('right')
         self.ui.rightUp.setEnabled(not not self.right_terminals)
         self.ui.rightDown.setEnabled(not not self.right_terminals)
 

@@ -104,7 +104,7 @@
        <string>Терминалы</string>
       </attribute>
      </widget>
-     <widget class="QWidget" name="payment">
+     <widget class="Payments" name="payment">
       <attribute name="title">
        <string>Оплата</string>
       </attribute>
@@ -192,6 +192,12 @@
    <class>Config</class>
    <extends>QWidget</extends>
    <header>config_ui</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>Payments</class>
+   <extends>QWidget</extends>
+   <header>payments</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

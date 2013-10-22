@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='stoppark',
-    version='0.5.6',
+    version='0.6.16',
     author='feanor',
     author_email='std.feanor@gmail.com',
     packages=['stoppark'],
@@ -15,6 +15,6 @@ setup(
     description='Stoppark project',
     long_description=open('README.txt').read(),
     install_requires=[
-        "u2py >= 1.6.45.2"
+        "u2py >= 1.6.55.1"
     ],
 )

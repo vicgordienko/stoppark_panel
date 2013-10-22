@@ -1,4 +1,5 @@
 ﻿# coding=utf-8
+from PyQt4.QtCore import pyqtSignal, QObject
 from gevent import socket
 from datetime import datetime, date
 from time import clock as measurement, mktime
@@ -29,7 +30,6 @@ class LocalDB(object):
     def __init__(self, filename=None):
         if filename is None:
             filename = u2py.config.db_filename
-            print filename
         self.filename = filename
         self.conn = sqlite3.connect(self.filename)
         self.conn.executescript(LocalDB.script)
@@ -62,10 +62,14 @@ class LocalDB(object):
         return self.query('select id,title from terminal where display = 1')
 
 
-class DB(object):
+class DB(QObject):
+    free_places_update = pyqtSignal(int)
+
     DATETIME_FORMAT = '%y-%m-%d %H:%M:%S'
 
-    def __init__(self, host='10.0.2.247', port=101, notify=None):
+    def __init__(self, host='10.0.2.247', port=101, notify=None, parent=None):
+        QObject.__init__(self, parent)
+
         self.addr = (host, port)
         self._free_places = (100, None)
         self._strings = [
@@ -84,11 +88,13 @@ class DB(object):
     @measure
     def query(self, q):
         try:
-            s = socket.create_connection(self.addr, timeout=1)
+            s = socket.create_connection(self.addr, timeout=3)
             s.send(q)
             answer = s.recv(1024)
-        except socket.error:
+        except socket.error as e:
+            print e.__class__.__name__, e
             if self.notify:
+                #self.notify(u'Ошибка БД', u'Нет связи с удалённой базой данных')
                 self.notify("DB Error", q.decode('utf8'))
             return False
 
@@ -121,6 +127,7 @@ class DB(object):
         if self._free_places is not None:
             free, timestamp = self._free_places
             self._free_places = (free + diff, timestamp)
+            self.free_places_update.emit(self._free_places[0])
         return self.query('update gstatus set placefree = placefree + %i' % (diff,))
 
     def get_free_places(self):
@@ -129,6 +136,7 @@ class DB(object):
             answer = self.query('select placefree from gstatus')
             try:
                 self._free_places = (int(answer[0][0]), now)
+                self.free_places_update.emit(self._free_places[0])
             except (IndexError, KeyError, ValueError, TypeError) as e:
                 print 'Incorrect response:', e.__class__.__name__, e
         return self._free_places[0]
@@ -239,7 +247,7 @@ class Card(object):
         return begin <= date.today() <= end
 
     def fio(self):
-        return '%s %s %s' % (self.fields[10], self.fields[8], self.fields[9])
+        return ('%s %s %s' % (self.fields[10], self.fields[8], self.fields[9])).decode('utf8')
 
 
 if __name__ == '__main__':

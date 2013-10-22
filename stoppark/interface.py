@@ -1,7 +1,6 @@
-﻿from u2py.interface_basis import load, BaseReader as Terminal, DumpableStructure, DumpableBigEndianStructure, ByteArray
+﻿from u2py.interface_basis import load, BaseReader as Terminal, DumpableStructure, DumpableBigEndianStructure, ByteArray, ReaderError
 from ctypes import POINTER as P, c_uint16, c_uint8, c_char, c_char_p, Structure
 from datetime import datetime
-
 
 class TerminalEntries(Structure):
     _fields_ = [
@@ -129,17 +128,21 @@ class TerminalReader(DumpableStructure):
     TIMEOUT = 30
 
     def process(self, direction, mainloop):
-        #print self
         if self.status == self.CARD_READ and self.time < self.TIMEOUT:
             card = mainloop.db.get_card(self.sn)
+            mainloop.notify.emit(u'Поднесение карточки к терминалу', u'%s' % (card.fio()))
             if card and card.check(direction):
-                mainloop.notify.emit('Incoming', '%s пожаловал!' % (card.fio()))
+                mainloop.notify.emit(u'Проезд разрешен', u'%s' % (card.fio()))
                 return lambda terminal, addr: TerminalState('man', 'in_open').set(terminal, addr, mainloop.db)
+            else:
+                mainloop.notify.emit(u'Проезд запрещен', u'%s' % (card.fio()))
         if self.status == self.CARD_IN:
-            mainloop.notify.emit('CARD_IN', self.sn)
+            card = mainloop.db.get_card(self.sn)
+            mainloop.notify.emit(u'Въезд', u'%s' % (card.fio()))
             mainloop.db.card_moved_inside(self.sn)
         if self.status == self.CARD_OUT:
-            mainloop.notify.emit('CARD_OUT', self.sn)
+            card = mainloop.db.get_card(self.sn)
+            mainloop.notify.emit(u'Выезд', u'%s' % (card.fio()))
             mainloop.db.card_moved_outside(self.sn)
 
 
@@ -250,17 +253,31 @@ class TerminalTime(DumpableStructure):
         return terminal_set_time(terminal, addr, self)
 
 
-terminal_set_state = load('terminal_set_state', (Terminal, c_uint8, P(TerminalState)))
-terminal_reset_entries = load('terminal_reset_entries', (Terminal, c_uint8,))
-terminal_get_entries = load('terminal_get_entries', (Terminal, c_uint8, P(TerminalEntries)))
-terminal_set_counters = load('terminal_set_counters', (Terminal, c_uint8, P(TerminalCounters)))
-terminal_get_readers = load('terminal_get_readers', (Terminal, c_uint8, P(TerminalReaders)))
-terminal_ack_readers = load('terminal_ack_readers', (Terminal, c_uint8,))
-terminal_get_barcode = load('terminal_get_barcode', (Terminal, c_uint8, P(TerminalBarcode)))
-terminal_ack_barcode = load('terminal_ack_barcode', (Terminal, c_uint8,))
-terminal_set_strings = load('terminal_set_strings', (Terminal, c_uint8, P(TerminalStrings)))
-terminal_set_time = load('terminal_set_time', (Terminal, c_uint8, P(TerminalTime)))
-terminal_show_message = load('terminal_show_message', (Terminal, c_uint8, c_char_p, c_uint8, c_uint8))
+def check(params):
+    """
+    This function assures that first parameter (namely: Terminal) is open.'
+    If it's not, then it tries to open it and returns -0xFF on failure.
+    """
+    terminal = params[0]
+    if not terminal.is_open():
+        try:
+            terminal.reopen()
+        except ReaderError:
+            import time
+            time.sleep(1)
+            return -0xFF
+
+terminal_set_state = load('terminal_set_state', (Terminal, c_uint8, P(TerminalState)), check_params=check)
+terminal_reset_entries = load('terminal_reset_entries', (Terminal, c_uint8,), check_params=check)
+terminal_get_entries = load('terminal_get_entries', (Terminal, c_uint8, P(TerminalEntries)), check_params=check)
+terminal_set_counters = load('terminal_set_counters', (Terminal, c_uint8, P(TerminalCounters)), check_params=check)
+terminal_get_readers = load('terminal_get_readers', (Terminal, c_uint8, P(TerminalReaders)), check_params=check)
+terminal_ack_readers = load('terminal_ack_readers', (Terminal, c_uint8,), check_params=check)
+terminal_get_barcode = load('terminal_get_barcode', (Terminal, c_uint8, P(TerminalBarcode)), check_params=check)
+terminal_ack_barcode = load('terminal_ack_barcode', (Terminal, c_uint8,), check_params=check)
+terminal_set_strings = load('terminal_set_strings', (Terminal, c_uint8, P(TerminalStrings)), check_params=check)
+terminal_set_time = load('terminal_set_time', (Terminal, c_uint8, P(TerminalTime)), check_params=check)
+terminal_show_message = load('terminal_show_message', (Terminal, c_uint8, c_char_p, c_uint8, c_uint8), check_params=check)
 
 if __name__ == '__main__':
     import config

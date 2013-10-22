@@ -200,6 +200,7 @@ class Terminals(QWidget):
         self.model = None
         self.mainloop = None
         self.delegate = None
+
         self.update_model()
 
     def test_display(self):
@@ -230,18 +231,16 @@ class Terminals(QWidget):
 
             self.mainloop = None
 
-        titles = DB(notify=lambda title, msg: self.notifier.showMessage(title, msg)).get_terminals()
-
-        self.model = QStandardItemModel(len(titles), 1)
-        [self.model.setItem(i, QStandardItem(str(addr))) for i, addr in enumerate(titles.keys())]
-
-        self.mainloop = Mainloop(titles.keys(), parent=self)
-        self.mainloop.ready.connect(lambda ok: self.on_mainloop_ready(ok, titles))
+        self.mainloop = Mainloop(parent=self)
+        self.mainloop.ready.connect(self.on_mainloop_ready)
         self.mainloop.notify.connect(lambda title, msg: self.notifier.showMessage(title, msg))
         self.mainloop.start()
 
     def on_mainloop_ready(self, ok, titles):
         if ok:
+            self.model = QStandardItemModel(len(titles), 1)
+            [self.model.setItem(i, QStandardItem(str(addr))) for i, addr in enumerate(titles.keys())]
+
             self.delegate = TerminalDelegate(self.mainloop, titles)
             self.mainloop.report.connect(self.delegate.report)
             self.mainloop.state.connect(self.delegate.state)
@@ -250,6 +249,9 @@ class Terminals(QWidget):
             self.ui.terminals.setItemDelegateForColumn(0, self.delegate)
             [self.ui.terminals.openPersistentEditor(self.model.index(row, 0))
              for row in xrange(self.model.rowCount())]
+
+            self.mainloop.db.free_places_update.connect(self.ui.free_places.setValue)
+            self.mainloop.update_config()
         else:
             self.model = None
             self.mainloop = None

@@ -24,38 +24,44 @@ def device_loop(terminal, mainloop, addr):
 
 
 class Mainloop(QObject):
-    ready = pyqtSignal(bool)
+    ready = pyqtSignal(bool, dict)
     report = pyqtSignal(int, str)
     state = pyqtSignal(int, str)
     notify = pyqtSignal(str, str)
 
-    def __init__(self, devices, parent=None):
+    def __init__(self, parent=None):
         super(Mainloop, self).__init__(parent)
         self.queue = None
-        self.db = DB(notify=lambda title, msg: self.notify.emit(title, msg))
         self.thread = None
-        self.devices = devices
+        self.db = None
 
-    def spawn_device_greenlets(self, terminal):
-        return [spawn(device_loop, terminal, self, addr) for addr in self.devices]
+    def spawn_device_greenlets(self, terminal, devices):
+        return [spawn(device_loop, terminal, self, addr) for addr in devices]
 
     def _mainloop(self):
 
-        if not self.devices:
-            self.notify.emit('Terminal error', 'No devices')
-            self.ready.emit(False)
-            return
-
         terminal = Terminal()
         if not terminal.is_open():
-            self.notify.emit('Terminal error', 'No terminal')
-            self.ready.emit(False)
+            self.notify.emit(u'Ошибка', u'Нет связи с концентратором')
+            #self.notify.emit('Terminal error', 'No terminal')
+            self.ready.emit(False, {})
+            return
+
+        if self.db is None:
+            self.db = DB(notify=lambda title, msg: self.notify.emit(title, msg), parent=self)
+        titles = self.db.get_terminals()
+        devices = titles.keys()
+
+        if not devices:
+            self.notify.emit(u'Ошибка', u'Нет информации о терминалах')
+            #self.notify.emit('Terminal error', 'No devices')
+            self.ready.emit(False, {})
             return
 
         self.queue = Queue()
-        self.ready.emit(True)
+        self.ready.emit(True, titles)
 
-        greenlets = self.spawn_device_greenlets(terminal)
+        greenlets = self.spawn_device_greenlets(terminal, devices)
 
         while True:
             command = self.queue.get()
@@ -67,6 +73,7 @@ class Mainloop(QObject):
                 break
 
         terminal.close()
+        self.queue = None
         print 'Mainloop completed'
 
     def start(self):

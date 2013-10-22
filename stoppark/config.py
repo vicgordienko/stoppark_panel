@@ -2,6 +2,8 @@ import u2py.config
 import sys
 import os
 
+u2py.config.raise_on_io_error = False
+
 win32 = sys.platform == 'win32'
 
 stoppark_dir = os.path.join('.' if win32 else os.environ['HOME'], '.stoppark')
@@ -20,7 +22,6 @@ else:
     u2py.config.reader_path = [
         {'path': '\\\\.\\COM4', 'baud': 38400, 'parity': 2, 'impl': 'asio-mt'}
     ]
-
 
 def setup_logging(handler=None):
     if handler == None:

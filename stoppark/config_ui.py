@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from PyQt4 import uic
 from PyQt4.QtCore import pyqtSignal
-from PyQt4.QtGui import QWidget
+from PyQt4.QtGui import QWidget, QDialog
 from datetime import datetime
 from terminal_config import TerminalConfig
 from flickcharm import FlickCharm
@@ -40,10 +40,9 @@ class Config(QWidget):
 
     def setup_terminals(self):
         self.terminal_config = TerminalConfig()
-        self.terminal_config.setModal(True)
-        self.terminal_config.exec_()
+        if self.terminal_config.exec_() == QDialog.Accepted:
+            self.update_terminals()
         self.terminal_config = None
-        self.terminals_changed.emit()
 
     def update_terminals_config(self):
         self.terminals.update_device_config()

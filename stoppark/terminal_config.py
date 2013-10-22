@@ -128,6 +128,7 @@ class TerminalConfig(QDialog):
         self.ui.terminals.horizontalHeader().setResizeMode(QHeaderView.Stretch)
 
         self.ui.ok.clicked.connect(self.edit_completed)
+        self.ui.cancel.clicked.connect(self.cancel)
         self.ui.set_left.clicked.connect(self.set_left)
         self.ui.set_right.clicked.connect(self.set_right)
 
@@ -146,4 +147,7 @@ class TerminalConfig(QDialog):
     def edit_completed(self):
         self.model.submitAll()
         self.db.commit()
-        self.close()
+        self.accept()
+
+    def cancel(self):
+        self.reject()
