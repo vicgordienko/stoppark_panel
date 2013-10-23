@@ -12,7 +12,7 @@ class Main(QWidget):
         self.ui = uiClass()
         self.ui.setupUi(self)
 
-        self.ui.config.setup(self.ui.terminals, self.ui.payment)
+        self.ui.config.setup(self.ui.terminals, self.ui.payments)
 
         self.ui.terminals.ready.connect(self.ui.config.terminals_ready)
         self.ui.config.terminals_changed.connect(self.ui.terminals.update_model)
@@ -28,6 +28,8 @@ class Main(QWidget):
         self.ui.rightDown.clicked.connect(self.right_down)
 
         self.update_terminals()
+
+        self.ui.payments.new_payment.connect(lambda: self.ui.tabs.setCurrentIndex(1))
         #self.setWindowFlags(Qt.CustomizeWindowHint)
 
     def left_up(self):
@@ -58,6 +60,7 @@ class Main(QWidget):
 
     def closeEvent(self, event):
         self.ui.terminals.stop_mainloop()
+        self.ui.payments.stop_reader()
 
         return QWidget.closeEvent(self, event)
 

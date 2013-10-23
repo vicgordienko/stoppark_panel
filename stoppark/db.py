@@ -88,7 +88,7 @@ class DB(QObject):
     @measure
     def query(self, q):
         try:
-            s = socket.create_connection(self.addr, timeout=3)
+            s = socket.create_connection(self.addr, timeout=5)
             s.send(q)
             answer = s.recv(1024)
         except socket.error as e:
@@ -106,16 +106,10 @@ class DB(QObject):
         return [line.split('|') for line in answer.split('\n')]
 
     def get_card(self, sn):
-        return Card.create(self.query('select * from card where cardid = \"%s\"' % (sn,)))
+        return Card.create(self.query('select * from card where cardid = "%s"' % (sn,)))
 
     def get_ticket(self, bar):
         return Ticket.create(self.query('select * from ticket where bar = "%s"' % (bar,)))
-
-    def card_moved_inside(self, sn):
-        return self.query('update card set status = %i where cardid = \"%s\"' % (Card.INSIDE, sn)) is None
-
-    def card_moved_outside(self, sn):
-        return self.query('update card set status = %i where cardid = \"%s\"' % (Card.OUTSIDE, sn)) is None
 
     def get_terminals(self):
         ret = self.query('select terminal_id,title from terminal')
@@ -154,12 +148,12 @@ class DB(QObject):
         args = (event_name, now, addr, reason, self.get_free_places())
         return self.query('insert into events values("Event",NULL,"%s","%s",%i,"","%s",%i,"","")' % args)
 
-    def generate_pass_event(self, addr, inside):
+    def generate_pass_event(self, addr, inside, sn=None):
         direction_name = 'внутрь' if inside else 'наружу'
         now = datetime.now().strftime(self.DATETIME_FORMAT)
-        args = (now, addr, direction_name)
+        args = (now, addr, direction_name, sn if sn else '')
 
-        return self.query('insert into events values("Event",NULL,"проезд","%s",%i,"%s","",(select placefree from gstatus),"","")' % args)
+        return self.query('insert into events values("Event",NULL,"проезд","%s",%i,"%s","",(select placefree from gstatus),"%s","")' % args)
 
     def get_config_strings(self):
         ret = self.query('select userstr1,userstr2,userstr3,userstr4,userstr5,userstr6,userstr7,userstr8 from config')
@@ -168,10 +162,36 @@ class DB(QObject):
         return self._strings
 
 
+class TicketPayment(object):
+    def __init__(self, ticket, tariff):
+        self.ticket = ticket
+        self.tariff = tariff
+
+        self.now = datetime.now()
+
+        self.timedelta = self.now - self.ticket.time_in()
+        self.minutes = self.timedelta.total_seconds() / 60
+        self.price = self.minutes * 200
+
+    def explanation(self):
+        return u'''
+        Время, проведенное на парковке: %i мин.\n
+        Стоимость: %i грн.
+        ''' % (self.minutes, self.price)
+
+    def execute(self, db):
+        args = (self.tariff, self.price, self.now.strftime(db.DATETIME_FORMAT), Ticket.PAID)
+        return db.query('update ticket set typetarif=%i, timeout="%s", status = status & %i' % args)
+
+
 class Ticket(object):
     IN = 1
     PAID = 5
     OUT = 15
+
+    @staticmethod
+    def remove(db, bar):
+        return db.query('delete from ticket where bar="%s"' % (bar,))
 
     @staticmethod
     def create(response):
@@ -182,8 +202,27 @@ class Ticket(object):
         except (TypeError, AssertionError):
             return False
 
+    @staticmethod
+    def parse_bar(bar):
+        return datetime.strptime(str(datetime.now().year) + bar[:10], '%Y%m%d%H%M%S')
+
+    @staticmethod
+    def register(db, bar):
+        query = 'insert into ticket values("%s", NULL, "%s", NULL, NULL, NULL, NULL, "%s", NULL, NULL, NULL, 1)'
+        args = ("Ticket", bar, Ticket.parse_bar(bar).strftime(DB.DATETIME_FORMAT))
+        return db.query(query % args) is None
+
+    def pay(self, tariff):
+        return TicketPayment(self, tariff)
+
+    def pay_excess(self, tariff):
+        pass
+
     def __init__(self, fields):
         self.fields = fields
+
+    def time_in(self):
+        return datetime.strptime(self.fields[7], DB.DATETIME_FORMAT)
 
     def check(self):
         status = int(self.fields[11])
@@ -249,7 +288,15 @@ class Card(object):
     def fio(self):
         return ('%s %s %s' % (self.fields[10], self.fields[8], self.fields[9])).decode('utf8')
 
+    def sn(self):
+        return self.fields[3]
+
+    def moved(self, db, addr, inside):
+        status = Card.INSIDE if inside else Card.OUTSIDE
+        db.query('update card set status = %i where cardid = \"%s\"' % status, self.sn())
+        return db.generate_pass_event(addr, inside, self.sn())
+
 
 if __name__ == '__main__':
-    db = DB()
-    print db.get_terminal_titles()
+    d = DB()
+    Ticket.remove(d, '102217023700000025')

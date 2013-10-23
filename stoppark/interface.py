@@ -1,4 +1,5 @@
-﻿from u2py.interface_basis import load, BaseReader as Terminal, DumpableStructure, DumpableBigEndianStructure, ByteArray, ReaderError
+﻿from u2py.interface_basis import load, BaseReader as Terminal, DumpableStructure, DumpableBigEndianStructure, ByteArray
+from u2py.interface import ReaderError
 from ctypes import POINTER as P, c_uint16, c_uint8, c_char, c_char_p, Structure
 from datetime import datetime
 
@@ -127,23 +128,25 @@ class TerminalReader(DumpableStructure):
 
     TIMEOUT = 30
 
-    def process(self, direction, mainloop):
+    def process(self, addr, direction, mainloop):
         if self.status == self.CARD_READ and self.time < self.TIMEOUT:
             card = mainloop.db.get_card(self.sn)
             mainloop.notify.emit(u'Поднесение карточки к терминалу', u'%s' % (card.fio()))
             if card and card.check(direction):
                 mainloop.notify.emit(u'Проезд разрешен', u'%s' % (card.fio()))
-                return lambda terminal, addr: TerminalState('man', 'in_open').set(terminal, addr, mainloop.db)
+                TerminalState('man', 'in_open').set(mainloop.terminal, addr, mainloop.db)
+                TerminalMessage('Проезд разрешен.').set(mainloop.terminal, addr)
             else:
                 mainloop.notify.emit(u'Проезд запрещен', u'%s' % (card.fio()))
+                TerminalMessage('Проезд запрещен.').set(mainloop.terminal, addr)
         if self.status == self.CARD_IN:
             card = mainloop.db.get_card(self.sn)
             mainloop.notify.emit(u'Въезд', u'%s' % (card.fio()))
-            mainloop.db.card_moved_inside(self.sn)
+            card.moved(mainloop.db, addr, inside=True)
         if self.status == self.CARD_OUT:
             card = mainloop.db.get_card(self.sn)
             mainloop.notify.emit(u'Выезд', u'%s' % (card.fio()))
-            mainloop.db.card_moved_outside(self.sn)
+            card.moved(mainloop.db, addr, inside=False)
 
 
 class TerminalReaders(Structure):
@@ -168,9 +171,7 @@ class TerminalReaders(Structure):
         terminal_ack_readers(terminal, self.addr)
 
         handler = self.reader_out if direction else self.reader_in
-        action = handler.process(direction, mainloop)
-        if action:
-            action(terminal, self.addr)
+        handler.process(self.addr, direction, mainloop)
 
         return True
 
