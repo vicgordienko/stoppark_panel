@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from PyQt4 import uic
-from PyQt4.QtCore import pyqtSignal, Qt, QVariant, QSize, QEvent
+from PyQt4.QtCore import Qt, QVariant, QSize, QEvent
 from PyQt4.QtGui import QDialog, QFont, QHeaderView, QStyledItemDelegate
 from PyQt4.QtGui import QApplication, QStyle, QStyleOptionViewItem, QColor
-from PyQt4.QtSql import QSqlDatabase, QSqlTableModel
-import u2py.config
+from PyQt4.QtSql import QSqlTableModel
+from config import QDB
 
 
 class CenteredCheckBoxDelegate(QStyledItemDelegate):
@@ -29,6 +29,7 @@ class CenteredCheckBoxDelegate(QStyledItemDelegate):
 
         style.drawPrimitive(QStyle.PE_IndicatorItemViewItemCheck, mod_option, painter)
 
+    #noinspection PyPep8Naming
     def editorEvent(self, event, model, option, index):
         if event.type() == QEvent.MouseButtonRelease:
             value = model.data(index, Qt.CheckStateRole)
@@ -44,6 +45,7 @@ class TerminalSqlTableModel(QSqlTableModel):
 
         self.font = QFont("Monospace", 18)
 
+    #noinspection PyPep8Naming,PyMethodOverriding
     def headerData(self, col, orientation, role):
         if role == Qt.FontRole:
             return self.font
@@ -78,6 +80,7 @@ class TerminalSqlTableModel(QSqlTableModel):
             return QColor(Qt.darkCyan)
         return QVariant()
 
+    #noinspection PyMethodOverriding
     def data(self, index, role):
         if role == Qt.FontRole:
             return self.font
@@ -97,6 +100,7 @@ class TerminalSqlTableModel(QSqlTableModel):
             return QVariant()
         return QSqlTableModel.data(self, index, role)
 
+    #noinspection PyPep8Naming,PyMethodOverriding
     def setData(self, index, value, role):
         if index.column() == 2 and role == Qt.CheckStateRole:
             return QSqlTableModel.setData(self, index, QVariant('1' if value == Qt.Checked else '0'), Qt.EditRole)
@@ -110,12 +114,7 @@ class TerminalConfig(QDialog):
         self.ui = uic.loadUiType('terminal-config.ui')[0]()
         self.ui.setupUi(self)
 
-        self.db = QSqlDatabase.addDatabase("QSQLITE")
-        self.db.setDatabaseName(u2py.config.db_filename)
-
-        self.db.open()
-
-        self.model = TerminalSqlTableModel(self, self.db)
+        self.model = TerminalSqlTableModel(self, QDB)
         self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
         self.model.setTable('terminal')
         self.model.select()
@@ -146,7 +145,6 @@ class TerminalConfig(QDialog):
 
     def edit_completed(self):
         self.model.submitAll()
-        self.db.commit()
         self.accept()
 
     def cancel(self):

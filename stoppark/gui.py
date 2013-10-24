@@ -3,14 +3,18 @@ from PyQt4 import uic
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QWidget, QApplication
 from db import LocalDB
+from i18n import language
+_ = language.ugettext
+
 
 class Main(QWidget):
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
 
-        uiClass, qtBaseClass = uic.loadUiType('main.ui')
-        self.ui = uiClass()
+        self.ui = uic.loadUiType('main.ui')[0]()
         self.ui.setupUi(self)
+
+        self.localize()
 
         self.ui.config.setup(self.ui.terminals, self.ui.payments)
 
@@ -31,6 +35,11 @@ class Main(QWidget):
 
         self.ui.payments.new_payment.connect(lambda: self.ui.tabs.setCurrentIndex(1))
         #self.setWindowFlags(Qt.CustomizeWindowHint)
+
+    def localize(self):
+        self.ui.tabs.setTabText(0, _('Terminals'))
+        self.ui.tabs.setTabText(1, _('Payments'))
+        self.ui.tabs.setTabText(2, _('Config'))
 
     def left_up(self):
         for addr in self.left_terminals:
@@ -58,6 +67,7 @@ class Main(QWidget):
         self.ui.rightUp.setEnabled(not not self.right_terminals)
         self.ui.rightDown.setEnabled(not not self.right_terminals)
 
+    #noinspection PyPep8Naming
     def closeEvent(self, event):
         self.ui.terminals.stop_mainloop()
         self.ui.payments.stop_reader()
@@ -76,4 +86,3 @@ if __name__ == '__main__':
     widget.showMaximized()
 
     sys.exit(app.exec_())
-    widget = None

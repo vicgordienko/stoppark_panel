@@ -2,12 +2,16 @@ from distutils.core import setup
 
 setup(
     name='stoppark',
-    version='0.6.52',
+    version='0.7.14',
     author='feanor',
     author_email='std.feanor@gmail.com',
     packages=['stoppark'],
     package_data = {
-       'stoppark': ['*.ui','*.png'],
+       'stoppark': [
+           '*.ui',
+           '*.png',
+           'generate_pot',
+           'i18n/ru_RU/LC_MESSAGES/stoppark.mo'],
     },
     scripts=[],
     url='https://github.com/stdk/stoppark_ext',

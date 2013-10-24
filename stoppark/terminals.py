@@ -4,7 +4,6 @@ from PyQt4.QtGui import QWidget, QStyledItemDelegate, QStandardItemModel, QStand
 from PyQt4.QtGui import QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QSpacerItem
 from PyQt4.QtGui import QSizePolicy, QFont, QIcon, QSystemTrayIcon, QGestureRecognizer
 from mainloop import Mainloop
-from db import DB
 
 
 class MouseTapAndHoldGestureRecognizer(QGestureRecognizer):
@@ -171,15 +170,18 @@ class TerminalDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         pass
 
+    #noinspection PyPep8Naming
     def createEditor(self, parent, option, index):
         addr = index.model().data(index, Qt.EditRole).toInt()[0]
         editor = TerminalWidget(self.mainloop, addr, self.titles[addr], parent=parent)
         self.editors[addr] = editor
         return editor
 
+    #noinspection PyPep8Naming
     def updateEditorGeometry(self, editor, option, index):
         editor.setGeometry(option.rect)
 
+    #noinspection PyPep8Naming
     def sizeHint(self, option, index):
         return QSize(315, 80)
 
@@ -190,8 +192,7 @@ class Terminals(QWidget):
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
 
-        ui_class = uic.loadUiType('terminal.ui')[0]
-        self.ui = ui_class()
+        self.ui = uic.loadUiType('terminal.ui')[0]()
         self.ui.setupUi(self)
 
         self.notifier = QSystemTrayIcon(QIcon('arrow-up-icon.png'), self)

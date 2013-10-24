@@ -15,9 +15,9 @@ class Config(QWidget):
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
 
-        uiClass, qtBaseClass = uic.loadUiType('config.ui')
-        self.ui = uiClass()
+        self.ui = uic.loadUiType('config.ui')[0]()
         self.ui.setupUi(self)
+        #self.ui = uic.loadUi('config.ui', self)
 
         self.terminals = None
         self.payment = None

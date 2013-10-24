@@ -86,7 +86,8 @@ class Mainloop(QObject):
             self.thread.join()
 
     def test_display(self):
-        self.queue.put(lambda terminal: TerminalMessage('Добро пожаловать').set(terminal, 0xFF, 5))
+        test_message = u'Тестовое сообщение'
+        self.queue.put(lambda terminal: TerminalMessage(test_message).set(terminal, 0xFF, 5))
 
     def update_config(self, addr=0xFF):
         self.queue.put(lambda terminal: TerminalTime().set(terminal, addr))

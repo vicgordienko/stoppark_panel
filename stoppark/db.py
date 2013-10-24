@@ -5,6 +5,9 @@ from datetime import datetime, date
 from time import clock as measurement, mktime
 import u2py.config
 import sqlite3
+from i18n import language
+_ = language.ugettext
+
 
 def measure(f):
     def wrapper(*args, **kw):
@@ -24,6 +27,16 @@ class LocalDB(object):
         title text,
         display integer default 1,
         option text default ''
+    );
+    create table if not exists tariffs (
+        id integer primary key,
+        name text,
+        type integer,
+        interval integer,
+        cost integer,
+        zerotime text,
+        maxperday text,
+        note text
     );
     """
 
@@ -61,6 +74,19 @@ class LocalDB(object):
     def get_terminals(self):
         return self.query('select id,title from terminal where display = 1')
 
+    def update_tariffs(self, tariffs):
+        self.conn.executescript('delete from tariffs')
+        self.conn.executemany('insert into tariffs values(?,?,?,?,?,?,?,?)', tariffs)
+        self.conn.commit()
+
+    def get_tariff_by_id(self, tariff_id):
+        ret = self.query('select * from tariffs where id = ?', (tariff_id,))
+        if ret:
+            return ret[0]
+
+    def get_tariffs(self):
+        return self.query('select * from tariffs')
+
 
 class DB(QObject):
     free_places_update = pyqtSignal(int)
@@ -95,7 +121,7 @@ class DB(QObject):
             print e.__class__.__name__, e
             if self.notify:
                 #self.notify(u'Ошибка БД', u'Нет связи с удалённой базой данных')
-                self.notify("DB Error", q.decode('utf8'))
+                self.notify(_("Database Error"), q.decode('utf8'))
             return False
 
         if answer == 'FAIL':
@@ -116,6 +142,12 @@ class DB(QObject):
         if ret:
             self.local.update_terminals(ret)
         return dict((int(key), value.decode('utf8')) for key, value in self.local.get_terminals())
+
+    def get_tariffs(self):
+        ret = self.query('select * from tariff')
+        if ret:
+            self.local.update_tariffs(ret)
+        return self.local.get_tariffs()
 
     def update_free_places(self, diff):
         if self._free_places is not None:
@@ -181,7 +213,7 @@ class TicketPayment(object):
 
     def execute(self, db):
         args = (self.tariff, self.price, self.now.strftime(db.DATETIME_FORMAT), Ticket.PAID)
-        return db.query('update ticket set typetarif=%i, timeout="%s", status = status & %i' % args)
+        return db.query('update ticket set typetarif=%i, summ=%i, timeout="%s", status = status & %i' % args)
 
 
 class Ticket(object):
@@ -220,6 +252,18 @@ class Ticket(object):
 
     def __init__(self, fields):
         self.fields = fields
+
+        self.id = fields[1]
+        self.bar = fields[2]
+        self.tariff_type = fields[3]
+        self.tariff_price = fields[4]
+        self.tariff_summ = fields[5]
+        self.tariff_summ_excess = fields[6]
+        self.time_in = fields[7]
+        self.time_paid = fields[8]
+        self.time_count = fields[9]
+        self.time_excess_paid = fields[10]
+        self.status = fields[11]
 
     def time_in(self):
         return datetime.strptime(self.fields[7], DB.DATETIME_FORMAT)
@@ -273,6 +317,25 @@ class Card(object):
     def __init__(self, fields):
         self.fields = fields
 
+        self.id = fields[1]
+        self.type = fields[2]
+        self._sn = fields[3]
+        self.date_reg = fields[4]
+        self.date_end = fields[5]
+        self.date_in = fields[6]
+        self.date_out = fields[7]
+        self.drive_name = fields[8]
+        self.drive_sname = fields[9]
+        self.drive_fname = fields[10]
+        self.drive_phone = fields[11]
+        self.number = fields[12]
+        self.model = fields[13]
+        self.color = fields[14]
+        self.status = fields[15]
+        self.tariff_type = fields[16]
+        self.tariff_price = fields[17]
+        self.tariff_sum = fields[18]
+
     def check(self, direction):
         if int(self.fields[15]) not in self.ALLOWED_STATUS[direction]:
             return False
@@ -293,10 +356,10 @@ class Card(object):
 
     def moved(self, db, addr, inside):
         status = Card.INSIDE if inside else Card.OUTSIDE
-        db.query('update card set status = %i where cardid = \"%s\"' % status, self.sn())
+        db.query('update card set status = %i where cardid = \"%s\"' % (status, self.sn()))
         return db.generate_pass_event(addr, inside, self.sn())
 
 
 if __name__ == '__main__':
     d = DB()
-    Ticket.remove(d, '102217023700000025')
+    print d.get_tariffs()

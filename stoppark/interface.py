@@ -1,7 +1,11 @@
-﻿from u2py.interface_basis import load, BaseReader as Terminal, DumpableStructure, DumpableBigEndianStructure, ByteArray
+﻿# coding=utf-8
+from u2py.interface_basis import load, BaseReader as Terminal, DumpableStructure, DumpableBigEndianStructure, ByteArray
 from u2py.interface import ReaderError
 from ctypes import POINTER as P, c_uint16, c_uint8, c_char, c_char_p, Structure
 from datetime import datetime
+from i18n import language
+_ = language.ugettext
+
 
 class TerminalEntries(Structure):
     _fields_ = [
@@ -27,6 +31,7 @@ class TerminalEntries(Structure):
         ('status_reason', c_uint8),
     ]
 
+    #noinspection PyMissingConstructor
     def __init__(self, addr):
         self.addr = addr
 
@@ -79,6 +84,7 @@ class TerminalState(DumpableStructure):
     reverse_reasons = {v: k for k, v in reasons.items()}
     reverse_commands = {v: k for k, v in commands.items()}
 
+    #noinspection PyMissingConstructor
     def __init__(self, reason, command):
         self.reason = self.reasons.get(reason, reason)
         self.command = self.commands.get(command, command)
@@ -128,24 +134,24 @@ class TerminalReader(DumpableStructure):
 
     TIMEOUT = 30
 
-    def process(self, addr, direction, mainloop):
+    def process(self, terminal, addr, direction, mainloop):
         if self.status == self.CARD_READ and self.time < self.TIMEOUT:
             card = mainloop.db.get_card(self.sn)
-            mainloop.notify.emit(u'Поднесение карточки к терминалу', u'%s' % (card.fio()))
+            mainloop.notify.emit(_('Card at terminal'), u'%s' % (card.fio()))
             if card and card.check(direction):
-                mainloop.notify.emit(u'Проезд разрешен', u'%s' % (card.fio()))
-                TerminalState('man', 'in_open').set(mainloop.terminal, addr, mainloop.db)
-                TerminalMessage('Проезд разрешен.').set(mainloop.terminal, addr)
+                mainloop.notify.emit(_('Access permitted.'), u'%s' % (card.fio()))
+                TerminalState('man', 'in_open').set(terminal, addr, mainloop.db)
+                TerminalMessage(_('Access permitted.')).set(terminal, addr)
             else:
-                mainloop.notify.emit(u'Проезд запрещен', u'%s' % (card.fio()))
-                TerminalMessage('Проезд запрещен.').set(mainloop.terminal, addr)
+                mainloop.notify.emit(_('Access denied.'), u'%s' % (card.fio()))
+                TerminalMessage(_('Access denied.')).set(terminal, addr)
         if self.status == self.CARD_IN:
             card = mainloop.db.get_card(self.sn)
-            mainloop.notify.emit(u'Въезд', u'%s' % (card.fio()))
+            mainloop.notify.emit(_('Car inside'), u'%s' % (card.fio()))
             card.moved(mainloop.db, addr, inside=True)
         if self.status == self.CARD_OUT:
             card = mainloop.db.get_card(self.sn)
-            mainloop.notify.emit(u'Выезд', u'%s' % (card.fio()))
+            mainloop.notify.emit(_('Car outside'), u'%s' % (card.fio()))
             card.moved(mainloop.db, addr, inside=False)
 
 
@@ -155,6 +161,7 @@ class TerminalReaders(Structure):
         ('reader_out', TerminalReader),
     ]
 
+    #noinspection PyMissingConstructor
     def __init__(self, addr):
         self.addr = addr
 
@@ -171,7 +178,7 @@ class TerminalReaders(Structure):
         terminal_ack_readers(terminal, self.addr)
 
         handler = self.reader_out if direction else self.reader_in
-        handler.process(self.addr, direction, mainloop)
+        handler.process(terminal, self.addr, direction, mainloop)
 
         return True
 
@@ -187,6 +194,7 @@ class TerminalBarcode(DumpableStructure):
     BAR_LEFT = 0x01
     BAR_NO = 0x02
 
+    #noinspection PyMissingConstructor
     def __init__(self, addr):
         self.addr = addr
 
@@ -214,17 +222,20 @@ class TerminalStrings(Structure):
         ('check_lines', CheckLine * 8)
     ]
 
+    #noinspection PyMissingConstructor
     def __init__(self, db):
         strings = db.get_config_strings()
-        [setattr(self.check_lines[i], 'data', s.decode('utf8').encode('cp1251')[:30]) for i, s in enumerate(strings)]
+        [setattr(self.check_lines[i], 'data', s.decode('utf8').encode('cp1251', errors='replace')[:30])
+         for i, s in enumerate(strings)]
 
     def set(self, terminal, addr):
         return terminal_set_strings(terminal, addr, self)
 
 
 class TerminalMessage(Structure):
+    #noinspection PyMissingConstructor
     def __init__(self, message):
-        self.message = message.decode('utf8').encode('cp1251')
+        self.message = message.encode('cp1251', errors='replace')
         self.message += ' '*(80 - len(self.message))
 
     def set(self, terminal, addr, status=15):
@@ -241,6 +252,7 @@ class TerminalTime(DumpableStructure):
         ('second', c_uint8),
     ]
 
+    #noinspection PyMissingConstructor
     def __init__(self):
         now = datetime.now()
         self.year = now.year % 2000

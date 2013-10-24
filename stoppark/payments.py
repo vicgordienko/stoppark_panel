@@ -1,5 +1,5 @@
 from PyQt4 import uic
-from PyQt4.QtCore import QObject, pyqtSignal, QTimer
+from PyQt4.QtCore import QObject, pyqtSignal
 from PyQt4.QtGui import QWidget
 from gevent import socket, spawn, sleep
 from threading import Thread
@@ -10,7 +10,7 @@ class BARReader(QObject):
     bar_read = pyqtSignal(str)
 
     def __init__(self, parent=None):
-        QObject.__init__(self, parent=parent)
+        QObject.__init__(self, parent)
         self.thread = Thread(target=self._loop)
         self.sock = None
 
@@ -51,15 +51,20 @@ class Payments(QWidget):
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
 
-        self.ui = uic.loadUi('payments.ui', self)
+        self.ui = uic.loadUiType('payments.ui')[0]()
+        self.ui.setupUi(self)
 
         self.reader = BARReader(self)
         self.reader.bar_read.connect(self.handle_bar)
         self.reader.start()
 
         self.db = DB()
+        self.tariffs = self.db.get_tariffs()
 
         self.ui.pay.setEnabled(False)
+
+        self.ticket = None
+        self.payment = None
 
     def handle_bar(self, bar):
         self.ui.bar.setText(bar)
