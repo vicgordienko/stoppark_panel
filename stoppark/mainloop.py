@@ -48,7 +48,7 @@ class Mainloop(QObject):
             return
 
         if self.db is None:
-            self.db = DB(notify=lambda title, msg: self.notify.emit(title, msg), parent=self)
+            self.db = DB(notify=lambda title, msg: self.notify.emit(title, msg))
         titles = self.db.get_terminals()
         devices = titles.keys()
 

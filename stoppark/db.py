@@ -5,6 +5,7 @@ from datetime import datetime, date
 from time import clock as measurement, mktime
 import u2py.config
 import sqlite3
+from math import ceil, floor
 from i18n import language
 _ = language.ugettext
 
@@ -114,7 +115,7 @@ class DB(QObject):
     @measure
     def query(self, q):
         try:
-            s = socket.create_connection(self.addr, timeout=5)
+            s = socket.create_connection(self.addr, timeout=20)
             s.send(q)
             answer = s.recv(1024)
         except socket.error as e:
@@ -147,7 +148,7 @@ class DB(QObject):
         ret = self.query('select * from tariff')
         if ret:
             self.local.update_tariffs(ret)
-        return self.local.get_tariffs()
+        return [Tariff.create(t) for t in self.local.get_tariffs()]
 
     def update_free_places(self, diff):
         if self._free_places is not None:
@@ -201,25 +202,61 @@ class TicketPayment(object):
 
         self.now = datetime.now()
 
-        self.timedelta = self.now - self.ticket.time_in()
-        self.minutes = self.timedelta.total_seconds() / 60
-        self.price = self.minutes * 200
+        self.timedelta = self.now - self.ticket.time_in
+        self.total_seconds = self.timedelta.total_seconds()
+        self.units = ceil(self.total_seconds / Tariff.DIVISORS[self.tariff.interval])
+        self.hours = floor(self.total_seconds / 3600)
+        self.minutes = floor((self.total_seconds - self.hours*3600) / 60)
+        self.price = self.units * self.tariff.cost
 
     def explanation(self):
         return u'''
-        Время, проведенное на парковке: %i мин.\n
+        Оплата по тарифу "%s"
+        Время вьезда: %s
+        Время, проведенное на парковке: %i час. %i мин.
+        Единиц оплаты: %f
         Стоимость: %i грн.
-        ''' % (self.minutes, self.price)
+        ''' % (self.tariff.name, self.ticket.time_in.strftime(DB.DATETIME_FORMAT),
+               self.hours, self.minutes, self.units, self.price)
 
     def execute(self, db):
-        args = (self.tariff, self.price, self.now.strftime(db.DATETIME_FORMAT), Ticket.PAID)
-        return db.query('update ticket set typetarif=%i, summ=%i, timeout="%s", status = status & %i' % args)
+        args = (self.tariff.id, self.tariff.cost, self.price, self.now.strftime(db.DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
+        return db.query('update ticket set typetarif=%i, pricetarif=%i, summ=%i, timeout="%s", status = status | %i where bar="%s"' % args)
+
+
+class TicketExcessPayment(object):
+    def __init__(self, ticket, tariff, excess=False):
+        self.ticket = ticket
+        self.tariff = tariff
+        self.excess = excess
+
+        self.now = datetime.now()
+
+        self.base_time = self.ticket.time_excess_paid if self.excess else self.ticket.time_paid
+        self.timedelta = self.now - self.base_time
+        self.units = ceil(self.timedelta.total_seconds() / Tariff.DIVISORS[self.tariff.interval])
+        self.price = self.units * self.tariff.cost
+
+    def explanation(self):
+        return u'''
+        Доплата по тарифу "%s"\n
+        Время последней оплаты: %s\n
+        Дополнительное время, проведенное на парковке: %i час. %i мин.\n
+        Стоимость: %i грн.
+        ''' % (self.tariff.name, self.base_time.strftime(DB.DATETIME_FORMAT),
+               self.timedelta.hour, self.timedelta.minute, self.price / 100)
+
+    def execute(self, db):
+        args = (self.price, self.now.strftime(DB.DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
+        return db.query('update ticket set summ = summ + %i, timedopl="%s", status = status | %i where bar = "%s"' % args)
 
 
 class Ticket(object):
     IN = 1
     PAID = 5
     OUT = 15
+
+    EXCESS_INTERVAL = 15*60
 
     @staticmethod
     def remove(db, bar):
@@ -244,12 +281,6 @@ class Ticket(object):
         args = ("Ticket", bar, Ticket.parse_bar(bar).strftime(DB.DATETIME_FORMAT))
         return db.query(query % args) is None
 
-    def pay(self, tariff):
-        return TicketPayment(self, tariff)
-
-    def pay_excess(self, tariff):
-        pass
-
     def __init__(self, fields):
         self.fields = fields
 
@@ -257,31 +288,81 @@ class Ticket(object):
         self.bar = fields[2]
         self.tariff_type = fields[3]
         self.tariff_price = fields[4]
-        self.tariff_summ = fields[5]
-        self.tariff_summ_excess = fields[6]
-        self.time_in = fields[7]
-        self.time_paid = fields[8]
-        self.time_count = fields[9]
-        self.time_excess_paid = fields[10]
-        self.status = fields[11]
+        self.tariff_sum = fields[5]
+        self.tariff_sum_excess = fields[6]
+        self.time_in = datetime.strptime(fields[7], DB.DATETIME_FORMAT)
+        self.time_paid = datetime.strptime(fields[8], DB.DATETIME_FORMAT) if fields[8] != 'None' else None
+        self.time_count = datetime.strptime(fields[9], DB.DATETIME_FORMAT) if fields[9] != 'None' else None
+        self.time_excess_paid = datetime.strptime(fields[10], DB.DATETIME_FORMAT) if fields[10] != 'None' else None
+        self.status = int(fields[11])
 
-    def time_in(self):
-        return datetime.strptime(self.fields[7], DB.DATETIME_FORMAT)
+    def pay(self, tariff):
+        if self.status == self.IN:
+            return TicketPayment(self, tariff)
+
+        if self.status == self.PAID:
+            if self.time_excess_paid:
+                if (datetime.now() - self.time_excess_paid).total_seconds() > self.EXCESS_INTERVAL:
+                    return TicketExcessPayment(self, tariff, excess=True)
+
+            if self.time_paid:
+                if (datetime.now() - self.time_paid).total_seconds() > self.EXCESS_INTERVAL:
+                    return TicketExcessPayment(self, tariff)
 
     def check(self):
-        status = int(self.fields[11])
-        if status == self.IN:
+        if self.status == self.IN:
             return False
 
-        if status == self.PAID:
-            time_paid, time_paid2 = (
-                mktime(datetime.strptime(self.fields[8], DB.DATETIME_FORMAT).timetuple()),
-                mktime(datetime.strptime(self.fields[10], DB.DATETIME_FORMAT).timetuple())
+        if self.status == self.PAID:
+            time_paid, time_excess_paid = (
+                mktime(datetime.strptime(self.time_paid, DB.DATETIME_FORMAT).timetuple()),
+                mktime(datetime.strptime(self.time_excess_paid, DB.DATETIME_FORMAT).timetuple())
             )
 
             now = mktime(datetime.now().timetuple())
-            if now - time_paid < 15*60 or now - time_paid2 < 15*60:
+            if now - time_paid < self.EXCESS_INTERVAL or now - time_excess_paid < self.EXCESS_INTERVAL:
                 return True
+
+
+class Tariff(object):
+    HOURLY = 1
+    DAILY = 2
+    MONTHLY = 3
+
+    DIVISORS = {
+        HOURLY: 60*60,
+        DAILY: 60*60*24,
+        MONTHLY: 60*60*24*30
+    }
+
+    FIXED = 1
+    DYNAMIC = 2
+    ONCE = 3
+    PREPAID = 5
+    SUBSCRIPTION = 6
+
+    @staticmethod
+    def create(response):
+        try:
+            assert(len(response) >= 8)
+            return Tariff(response)
+        except (ValueError, TypeError, AssertionError):
+            return False
+
+    def __init__(self, fields):
+        self.fields = fields
+
+        self.id = int(fields[0])
+        self.name = fields[1].decode('utf8')
+        self.type = int(fields[2])
+        self.interval = int(fields[3])
+        try:
+            self.cost = int(fields[4])
+        except ValueError:
+            self.cost = fields[4].split(' ')
+        self.zero_time = fields[5]
+        self.max_per_day = fields[6]
+        self.note = fields[7]
 
 
 class Card(object):
@@ -311,15 +392,15 @@ class Card(object):
             fields = response[0]
             assert(len(fields) >= 19)
             return Card(fields)
-        except (TypeError, AssertionError):
+        except (ValueError, TypeError, AssertionError):
             return False
 
     def __init__(self, fields):
         self.fields = fields
 
         self.id = fields[1]
-        self.type = fields[2]
-        self._sn = fields[3]
+        self.type = int(fields[2])
+        self.sn = fields[3]
         self.date_reg = fields[4]
         self.date_end = fields[5]
         self.date_in = fields[6]
@@ -331,35 +412,36 @@ class Card(object):
         self.number = fields[12]
         self.model = fields[13]
         self.color = fields[14]
-        self.status = fields[15]
+        self.status = int(fields[15])
         self.tariff_type = fields[16]
         self.tariff_price = fields[17]
         self.tariff_sum = fields[18]
 
     def check(self, direction):
-        if int(self.fields[15]) not in self.ALLOWED_STATUS[direction]:
+        if self.status not in self.ALLOWED_STATUS[direction]:
             return False
-        if int(self.fields[2]) not in self.ALLOWED_TYPE:
+        if self.type not in self.ALLOWED_TYPE:
             return False
 
         begin, end = (
-            datetime.strptime(self.fields[4], '%y-%m-%d').date(),
-            datetime.strptime(self.fields[5], '%y-%m-%d').date()
+            datetime.strptime(self.date_reg, '%y-%m-%d').date(),
+            datetime.strptime(self.date_end, '%y-%m-%d').date()
         )
         return begin <= date.today() <= end
 
     def fio(self):
-        return ('%s %s %s' % (self.fields[10], self.fields[8], self.fields[9])).decode('utf8')
-
-    def sn(self):
-        return self.fields[3]
+        return ('%s %s %s' % (self.drive_fname, self.drive_name, self.sname)).decode('utf8')
 
     def moved(self, db, addr, inside):
         status = Card.INSIDE if inside else Card.OUTSIDE
-        db.query('update card set status = %i where cardid = \"%s\"' % (status, self.sn()))
-        return db.generate_pass_event(addr, inside, self.sn())
+        db.query('update card set status = %i where cardid = \"%s\"' % (status, self.sn))
+        return db.generate_pass_event(addr, inside, self.sn)
 
 
 if __name__ == '__main__':
     d = DB()
-    print d.get_tariffs()
+    d.query('update ticket set status=1 where bar = "102514265300000029"')
+    #tariff = d.get_tariffs()[0]
+    #t = d.get_ticket('102514265300000029')
+    #print t.pay(tariff).explanation()
+
