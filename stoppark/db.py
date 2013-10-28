@@ -1,7 +1,7 @@
 ﻿# coding=utf-8
 from PyQt4.QtCore import pyqtSignal, QObject
 from gevent import socket
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from time import clock as measurement, mktime
 import u2py.config
 import sqlite3
@@ -76,9 +76,12 @@ class LocalDB(object):
         return self.query('select id,title from terminal where display = 1')
 
     def update_tariffs(self, tariffs):
-        self.conn.executescript('delete from tariffs')
-        self.conn.executemany('insert into tariffs values(?,?,?,?,?,?,?,?)', tariffs)
-        self.conn.commit()
+        try:
+            self.conn.executescript('delete from tariffs')
+            self.conn.executemany('insert into tariffs values(?,?,?,?,?,?,?,?)', tariffs)
+            self.conn.commit()
+        except sqlite3.OperationalError as e:
+            print e.__class__.__name__, e
 
     def get_tariff_by_id(self, tariff_id):
         ret = self.query('select * from tariffs where id = ?', (tariff_id,))
@@ -201,27 +204,21 @@ class TicketPayment(object):
         self.tariff = tariff
 
         self.now = datetime.now()
-
-        self.timedelta = self.now - self.ticket.time_in
-        self.total_seconds = self.timedelta.total_seconds()
-        self.units = ceil(self.total_seconds / Tariff.DIVISORS[self.tariff.interval])
-        self.hours = floor(self.total_seconds / 3600)
-        self.minutes = floor((self.total_seconds - self.hours*3600) / 60)
-        self.price = self.units * self.tariff.cost
+        self.result = tariff.calc(self.ticket.time_in, self.now)
 
     def explanation(self):
         return u'''
         Оплата по тарифу "%s"
         Время вьезда: %s
-        Время, проведенное на парковке: %i час. %i мин.
-        Единиц оплаты: %f
-        Стоимость: %i грн.
-        ''' % (self.tariff.name, self.ticket.time_in.strftime(DB.DATETIME_FORMAT),
-               self.hours, self.minutes, self.units, self.price)
+        %s
+        ''' % (self.tariff.name, self.ticket.time_in.strftime(DB.DATETIME_FORMAT), self.result)
+
+    QUERY = 'update ticket set typetarif=%i, pricetarif=%i * 100, summ=%i * 100, summdopl=0, timeout="%s", status = status | %i where bar="%s"'
 
     def execute(self, db):
-        args = (self.tariff.id, self.tariff.cost, self.price, self.now.strftime(db.DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
-        return db.query('update ticket set typetarif=%i, pricetarif=%i, summ=%i, timeout="%s", status = status | %i where bar="%s"' % args)
+        args = (self.tariff.id, self.tariff.cost, self.result.price,
+                self.now.strftime(db.DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
+        return db.query(self.QUERY % args)
 
 
 class TicketExcessPayment(object):
@@ -231,24 +228,23 @@ class TicketExcessPayment(object):
         self.excess = excess
 
         self.now = datetime.now()
-
         self.base_time = self.ticket.time_excess_paid if self.excess else self.ticket.time_paid
-        self.timedelta = self.now - self.base_time
-        self.units = ceil(self.timedelta.total_seconds() / Tariff.DIVISORS[self.tariff.interval])
-        self.price = self.units * self.tariff.cost
+        self.result = tariff.calc(self.base_time, self.now)
 
     def explanation(self):
         return u'''
-        Доплата по тарифу "%s"\n
-        Время последней оплаты: %s\n
-        Дополнительное время, проведенное на парковке: %i час. %i мин.\n
-        Стоимость: %i грн.
-        ''' % (self.tariff.name, self.base_time.strftime(DB.DATETIME_FORMAT),
-               self.timedelta.hour, self.timedelta.minute, self.price / 100)
+        Доплата по тарифу "%s"
+        Время вьезда: %s
+        Время последней оплаты: %s
+        %s
+        ''' % (self.tariff.name, self.ticket.time_in.strftime(DB.DATETIME_FORMAT),
+               self.base_time.strftime(DB.DATETIME_FORMAT), self.result)
+
+    QUERY = 'update ticket set summdopl = summdopl + %i * 100, timedopl="%s", status = status | %i where bar = "%s"'
 
     def execute(self, db):
-        args = (self.price, self.now.strftime(DB.DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
-        return db.query('update ticket set summ = summ + %i, timedopl="%s", status = status | %i where bar = "%s"' % args)
+        args = (self.result.price, self.now.strftime(DB.DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
+        return db.query(self.QUERY % args)
 
 
 class Ticket(object):
@@ -304,6 +300,8 @@ class Ticket(object):
             if self.time_excess_paid:
                 if (datetime.now() - self.time_excess_paid).total_seconds() > self.EXCESS_INTERVAL:
                     return TicketExcessPayment(self, tariff, excess=True)
+                else:
+                    return None
 
             if self.time_paid:
                 if (datetime.now() - self.time_paid).total_seconds() > self.EXCESS_INTERVAL:
@@ -341,11 +339,20 @@ class Tariff(object):
     PREPAID = 5
     SUBSCRIPTION = 6
 
+    TYPES = {}
+
+    @staticmethod
+    def register(identifier):
+        def wrapper(cls):
+            Tariff.TYPES[identifier] = cls
+            return cls
+        return wrapper
+
     @staticmethod
     def create(response):
         try:
             assert(len(response) >= 8)
-            return Tariff(response)
+            return Tariff.TYPES.get(int(response[2]), Tariff)(response)
         except (ValueError, TypeError, AssertionError):
             return False
 
@@ -360,9 +367,80 @@ class Tariff(object):
             self.cost = int(fields[4])
         except ValueError:
             self.cost = fields[4].split(' ')
-        self.zero_time = fields[5]
+        self.zero_time = [int(i, 10) for i in fields[5].split(':')] if fields[5] != 'None' else None
         self.max_per_day = fields[6]
         self.note = fields[7]
+
+
+class TariffResult(object):
+    def __init__(self, delta, units=0, cost=0, max_per_day=None):
+        """
+        max_per_day parameter should only be present for  tariffs with hour interval.
+        It activates minimization algorithm
+
+        """
+        self.days = delta.days
+        self.hours = int(floor(delta.seconds / 3600))
+        self.minutes = int(floor((delta.seconds % 3600) / 60))
+        self.units = units
+
+        self.price = self.units * cost
+        if max_per_day is not None and self.price > max_per_day:
+            cost_per_day = min(max_per_day, cost*24)
+            self.price = cost_per_day * (self.units / 24)
+            self.price += min((self.units % 24)*cost, max_per_day)
+
+    def __str__(self):
+        return u"""
+        Время, проведенное на парковке: %i д. %i час. %i мин.
+        Единиц оплаты: %f
+        Стоимость: %i грн.
+        """ % (self.days, self.hours, self.minutes, self.units, self.price)
+
+    def __repr__(self):
+        return str((self.days, self.hours, self.minutes, self.units, self.price))
+
+
+@Tariff.register(Tariff.FIXED)
+class FixedTariff(Tariff):
+    """
+    >>> tariff = FixedTariff(['1', 'Час 1 грн.', '1', '1', '1', 'None', 'None', 'None'])
+    >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,10,0))
+    (0, 0, 10, 0, 0)
+    >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,45,0))
+    (0, 0, 45, 1.0, 1.0)
+    >>> tariff.calc(datetime(2013,10,28,9,0,0), datetime(2013,10,28,14,45,0))
+    (0, 5, 45, 6.0, 6.0)
+    >>> tariff = FixedTariff(['1', 'Час 1 грн. X', '1', '2', '1', '09:00', 'None', 'None'])
+    >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,11,10,0))
+    (2, 3, 10, 4.0, 4.0)
+    """
+
+    FREE_TIME = 60*15
+
+    def __init__(self, fields):
+        super(FixedTariff, self).__init__(fields)
+
+    def _calc_a(self, begin, end):
+        delta = end - begin
+        seconds = delta.total_seconds()
+        if seconds < self.FREE_TIME:
+            return TariffResult(delta)
+        units = ceil((seconds - self.FREE_TIME) / Tariff.DIVISORS[self.interval])
+        return TariffResult(delta, units, self.cost)
+
+    def calc(self, begin, end):
+        if self.interval == Tariff.DAILY and self.zero_time:
+            pivot = begin.replace(hour=self.zero_time[0], minute=self.zero_time[1], second=0)
+            if pivot < begin:
+                pivot += timedelta(days=1)
+            if pivot > end:
+                return self._calc_a(begin, end)
+            unit_diff = 1 if (pivot - begin).total_seconds() > self.FREE_TIME else 0
+            result = self._calc_a(pivot, end)
+            return TariffResult(end - begin, result.units + unit_diff, self.cost)
+        else:
+            return self._calc_a(begin, end)
 
 
 class Card(object):
@@ -439,8 +517,16 @@ class Card(object):
 
 
 if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
+
     d = DB()
-    d.query('update ticket set status=1 where bar = "102514265300000029"')
+    #d.query('update ticket set status=5 where bar = "102514265300000029"')
+    #d.query('delete from ticket where bar >= "102516091500000030"')
+    #d.query('update ticket set timeout="13-10-28 11:40:00" where bar = "102516091500000030"')
+    #d.query('update ticket set summdopl = summdopl+1 where bar = "102516091500000030"')
+    #d.query('select * from ticket where  bar = "102516091500000030" ')
+    #d.query('select * from tariff where id = 2')
     #tariff = d.get_tariffs()[0]
     #t = d.get_ticket('102514265300000029')
     #print t.pay(tariff).explanation()

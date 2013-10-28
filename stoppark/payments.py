@@ -1,10 +1,11 @@
 from PyQt4 import uic
-from PyQt4.QtCore import QObject, pyqtSignal
-from PyQt4.QtGui import QWidget
+from PyQt4.QtCore import QObject, pyqtSignal, Qt, QRect, QRectF
+from PyQt4.QtGui import QWidget, QGraphicsScene, QGraphicsItem, QFont, QStyle, QColor, QPainter, QFrame, QFontMetrics
 from gevent import socket, spawn, sleep
 from gevent.queue import Queue
 from threading import Thread
 from db import DB, Ticket
+from flickcharm import FlickCharm
 import time
 
 
@@ -93,6 +94,42 @@ class Reader(QObject):
             print 'Already stopped'
 
 
+ITEM_WIDTH = 500
+ITEM_HEIGHT = 70
+
+
+class TariffItem(QGraphicsItem):
+    def __init__(self, tariff):
+        QGraphicsItem.__init__(self)
+        self.tariff = tariff
+        self.str1 = tariff.name
+        self.str2 = '(%i)' % (tariff.interval,)
+        self.font1 = QFont("Lucida Grande")
+        self.font2 = QFont("Lucida Grande")
+        self.font1.setBold(True)
+        self.font1.setPixelSize(ITEM_HEIGHT / 2)
+        self.font2.setPixelSize(ITEM_HEIGHT / 2)
+        self.offset = QFontMetrics(self.font1).width(self.str1) + 15
+
+    def boundingRect(self):
+        return QRectF(0, 0, ITEM_WIDTH, ITEM_HEIGHT)
+
+    def paint(self, painter, option, widget):
+        if option.state & QStyle.State_Selected:
+            painter.fillRect(self.boundingRect(), QColor(0, 128, 240))
+            painter.setPen(Qt.white)
+        else:
+            painter.setPen(Qt.lightGray)
+            painter.drawRect(self.boundingRect())
+            painter.setPen(Qt.black)
+        painter.setFont(self.font1)
+        painter.drawText(QRect(10, 0, self.offset, ITEM_HEIGHT),
+                         Qt.AlignVCenter, self.str1)
+        painter.setFont(self.font2)
+        painter.drawText(QRect(self.offset, 0, ITEM_WIDTH, ITEM_HEIGHT),
+                         Qt.AlignVCenter, self.str2)
+
+
 class Payments(QWidget):
     new_payment = pyqtSignal()
 
@@ -101,6 +138,7 @@ class Payments(QWidget):
 
         self.tariffs = None
         self.payment = None
+        self.scene = None
 
         self.ui = uic.loadUiType('payments.ui')[0]()
         self.ui.setupUi(self)
@@ -113,6 +151,12 @@ class Payments(QWidget):
 
         self.ui.cancel.clicked.connect(self.cancel)
         self.ui.pay.clicked.connect(self.pay)
+
+        self.ui.tariffs.setRenderHints(QPainter.TextAntialiasing)
+        self.ui.tariffs.setFrameShape(QFrame.NoFrame)
+
+        self.flick = FlickCharm()
+        self.flick.activate_on(self.ui.tariffs)
 
     def update_tariffs(self, tariffs):
         if self.tariffs is None:
@@ -128,7 +172,7 @@ class Payments(QWidget):
         self.ui.pay.setEnabled(False)
 
     def ready_to_pay(self):
-        self.reader.new_ticket.disconnect()
+        self.reader.new_ticket.disconnect(self.handle_ticket)
         self.ui.cancel.setEnabled(True)
         self.ui.pay.setEnabled(True)
 
@@ -136,12 +180,39 @@ class Payments(QWidget):
         self.ui.bar.setText(ticket.bar)
         self.new_payment.emit()
 
-        self.payment = ticket.pay(self.tariffs[0])
+        self.scene = QGraphicsScene()
+        self.scene.setItemIndexMethod(QGraphicsScene.NoIndex)
+
+        for i, tariff in enumerate(self.tariffs):
+            item = TariffItem(tariff)
+            self.scene.addItem(item)
+            item.setPos(i * ITEM_WIDTH, 0)
+            item.setFlag(QGraphicsItem.ItemIsSelectable, True)
+
+        self.scene.setItemIndexMethod(QGraphicsScene.BspTreeIndex)
+
+        self.ui.tariffs.setScene(self.scene)
+
+        self.scene.setItemIndexMethod(QGraphicsScene.BspTreeIndex)
+
+        self.scene.selectionChanged.connect(lambda: self.handle_ticket_with_current_tariff(ticket))
+
+    def handle_ticket_with_current_tariff(self, ticket):
+        selected = self.scene.selectedItems()
+        if not len(selected):
+            print 'No selection'
+            return
+        tariff = selected[0].tariff
+        if not hasattr(tariff, 'calc'):
+            self.ui.explanation.setText('Unsupported tariff.')
+            return
+
+        self.payment = ticket.pay(tariff)
         if self.payment:
             self.ui.explanation.setText(self.payment.explanation())
             self.ready_to_pay()
         else:
-            self.ui.explanation.setText('\nAlready paid.')
+            self.ui.explanation.setText('Already paid.')
 
     def pay(self):
         self.reader.payment_processed.connect(self.payment_completed)
@@ -157,9 +228,9 @@ class Payments(QWidget):
 
     def payment_completed(self):
         self.ui.progress.setVisible(False)
-        self.reader.payment_processed.disconnect()
+        self.reader.payment_processed.disconnect(self.payment_completed)
 
-        self.ui.explanation.setText(self.ui.explanation.text() + '\n Paid.')
+        self.ui.explanation.setText(self.ui.explanation.text() + 'Paid.')
         self.ready_to_handle()
 
     def stop_reader(self):

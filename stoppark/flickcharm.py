@@ -17,6 +17,7 @@ class FlickData(object):
         self.offset = QPoint(0, 0)
         self.drag_pos = QPoint(0, 0)
         self.speed = QPoint(0, 0)
+        self.q = 0
         self.ignored = []
 
 
@@ -95,11 +96,13 @@ class FlickCharm(QObject):
                 QApplication.postEvent(obj, event1)
                 QApplication.postEvent(obj, event2)
             elif event_type == QEvent.MouseMove:
-                consumed = True
-                data.state = FlickData.ManualScroll
-                data.dragPos = QCursor.pos()
-                if not self.d.ticker.isActive():
-                    self.d.ticker.start(20, self)
+                diff = data.press_pos - event.pos()
+                if diff.x()**2 + diff.y()**2 > 25:
+                    consumed = True
+                    data.state = FlickData.ManualScroll
+                    data.dragPos = QCursor.pos()
+                    if not self.d.ticker.isActive():
+                        self.d.ticker.start(20, self)
 
         elif data.state == FlickData.ManualScroll:
             if event_type == QEvent.MouseMove:
@@ -142,9 +145,11 @@ class FlickCharm(QObject):
         for data in self.d.flick_data.values():
             if data.state == FlickData.ManualScroll:
                 count += 1
-                cursorPos = QCursor.pos()
-                data.speed = (cursorPos - data.dragPos) / 2
-                data.dragPos = cursorPos
+                data.q = (data.q + 1) % 4
+                if data.q == 0:
+                    cursorPos = QCursor.pos()
+                    data.speed = (cursorPos - data.dragPos) * 8
+                    data.dragPos = cursorPos
             elif data.state == FlickData.AutoScroll:
                 count += 1
                 data.speed = decelerate(data.speed)
