@@ -1,5 +1,5 @@
 ﻿# coding=utf-8
-from PyQt4.QtCore import pyqtSignal, QObject
+from PyQt4.QtCore import pyqtSignal, pyqtProperty, QObject
 from gevent import socket
 from datetime import datetime, date, timedelta
 from time import clock as measurement, mktime
@@ -208,10 +208,10 @@ class TicketPayment(object):
 
     def explanation(self):
         return u'''
-        Оплата по тарифу "%s"
-        Время вьезда: %s
-        %s
-        ''' % (self.tariff.name, self.ticket.time_in.strftime(DB.DATETIME_FORMAT), self.result)
+Оплата по тарифу "%s"
+Время вьезда: %s
+%s
+''' % (self.tariff.name, self.ticket.time_in.strftime(DB.DATETIME_FORMAT), self.result)
 
     QUERY = 'update ticket set typetarif=%i, pricetarif=%i * 100, summ=%i * 100, summdopl=0, timeout="%s", status = status | %i where bar="%s"'
 
@@ -233,11 +233,10 @@ class TicketExcessPayment(object):
 
     def explanation(self):
         return u'''
-        Доплата по тарифу "%s"
-        Время вьезда: %s
-        Время последней оплаты: %s
-        %s
-        ''' % (self.tariff.name, self.ticket.time_in.strftime(DB.DATETIME_FORMAT),
+Доплата по тарифу "%s"
+Время вьезда: %s
+Время последней оплаты: %s
+%s''' % (self.tariff.name, self.ticket.time_in.strftime(DB.DATETIME_FORMAT),
                self.base_time.strftime(DB.DATETIME_FORMAT), self.result)
 
     QUERY = 'update ticket set summdopl = summdopl + %i * 100, timedopl="%s", status = status | %i where bar = "%s"'
@@ -322,7 +321,7 @@ class Ticket(object):
                 return True
 
 
-class Tariff(object):
+class Tariff(QObject):
     HOURLY = 1
     DAILY = 2
     MONTHLY = 3
@@ -357,12 +356,13 @@ class Tariff(object):
             return False
 
     def __init__(self, fields):
+        QObject.__init__(self)
         self.fields = fields
 
-        self.id = int(fields[0])
-        self.name = fields[1].decode('utf8')
-        self.type = int(fields[2])
-        self.interval = int(fields[3])
+        self._id = int(fields[0])
+        self._name = fields[1].decode('utf8')
+        self._type = int(fields[2])
+        self._interval = int(fields[3])
         try:
             self.cost = int(fields[4])
         except ValueError:
@@ -370,6 +370,22 @@ class Tariff(object):
         self.zero_time = [int(i, 10) for i in fields[5].split(':')] if fields[5] != 'None' else None
         self.max_per_day = fields[6]
         self.note = fields[7]
+
+    @pyqtProperty(int)
+    def id(self):
+        return self._id
+
+    @pyqtProperty(str)
+    def name(self):
+        return self._name
+
+    @pyqtProperty(int)
+    def type(self):
+        return self._type
+
+    @pyqtProperty(int)
+    def interval(self):
+        return self._interval
 
 
 class TariffResult(object):
@@ -392,10 +408,9 @@ class TariffResult(object):
 
     def __str__(self):
         return u"""
-        Время, проведенное на парковке: %i д. %i час. %i мин.
-        Единиц оплаты: %f
-        Стоимость: %i грн.
-        """ % (self.days, self.hours, self.minutes, self.units, self.price)
+Время, проведенное на парковке: %i д. %i час. %i мин.
+Единиц оплаты: %f
+Стоимость: %i грн.""" % (self.days, self.hours, self.minutes, self.units, self.price)
 
     def __repr__(self):
         return str((self.days, self.hours, self.minutes, self.units, self.price))
@@ -508,7 +523,7 @@ class Card(object):
         return begin <= date.today() <= end
 
     def fio(self):
-        return ('%s %s %s' % (self.drive_fname, self.drive_name, self.sname)).decode('utf8')
+        return ('%s %s %s' % (self.drive_fname, self.drive_name, self.drive_sname)).decode('utf8')
 
     def moved(self, db, addr, inside):
         status = Card.INSIDE if inside else Card.OUTSIDE
@@ -521,6 +536,7 @@ if __name__ == '__main__':
     doctest.testmod()
 
     d = DB()
+    #d.query('delete from ticket')
     #d.query('update ticket set status=5 where bar = "102514265300000029"')
     #d.query('delete from ticket where bar >= "102516091500000030"')
     #d.query('update ticket set timeout="13-10-28 11:40:00" where bar = "102516091500000030"')

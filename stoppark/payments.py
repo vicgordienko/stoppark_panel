@@ -1,11 +1,11 @@
 from PyQt4 import uic
-from PyQt4.QtCore import QObject, pyqtSignal, Qt, QRect, QRectF
-from PyQt4.QtGui import QWidget, QGraphicsScene, QGraphicsItem, QFont, QStyle, QColor, QPainter, QFrame, QFontMetrics
+from PyQt4.QtCore import QObject, pyqtSignal, QUrl
+from PyQt4.QtGui import QWidget
+from PyQt4.QtDeclarative import QDeclarativeView
 from gevent import socket, spawn, sleep
 from gevent.queue import Queue
 from threading import Thread
-from db import DB, Ticket
-from flickcharm import FlickCharm
+from db import DB, Ticket, Tariff
 import time
 
 
@@ -25,7 +25,6 @@ class Reader(QObject):
         try:
             while True:
                 bar = self.sock.recv(128).strip(';?\n\r')
-                print 'bar_read', time.time()
 
                 ticket = self.db.get_ticket(bar)
                 if not ticket:
@@ -34,8 +33,7 @@ class Reader(QObject):
 
                 print ticket
 
-                print 'bar_processed', time.time()
-
+                self._update_tariffs()
                 self.new_ticket.emit(ticket)
 
         except socket.error:
@@ -55,6 +53,9 @@ class Reader(QObject):
             self.tariffs_updated.emit(self.db.get_tariffs())
             sleep(60)
 
+    def _update_tariffs(self):
+        self.tariffs_updated.emit(self.db.get_tariffs())
+
     def _loop(self):
         self.queue = Queue()
         self.db = DB()
@@ -64,13 +65,18 @@ class Reader(QObject):
 
         spawn(self._job)
         spawn(self._reader)
-        spawn(self._tariff_updater)
+        #spawn(self._tariff_updater)
+
+        self._update_tariffs()
 
         while True:
-            payment = self.queue.get()
+            action = self.queue.get()
 
-            if payment is not None:
-                self._process_payment(payment)
+            if action is not None:
+                if action == 'tariffs':
+                    self._update_tariffs()
+                else:
+                    self._process_payment(action)
             else:
                 print 'got None'
                 #[greenlet.kill() for greenlet in greenlets]
@@ -81,53 +87,23 @@ class Reader(QObject):
     def start(self):
         self.thread.start()
 
+    def update_tariffs(self):
+        if self.queue:
+            self.queue.put('tariffs')
+        else:
+            print 'There is no queue to update tariffs.'
+
     def pay(self, payment):
         if self.queue:
             self.queue.put(payment)
         else:
-            print 'There is not queue to put payments.'
+            print 'There is no queue to put payments.'
 
     def stop(self):
         if self.queue is not None:
             self.queue.put(None)
         else:
             print 'Already stopped'
-
-
-ITEM_WIDTH = 500
-ITEM_HEIGHT = 70
-
-
-class TariffItem(QGraphicsItem):
-    def __init__(self, tariff):
-        QGraphicsItem.__init__(self)
-        self.tariff = tariff
-        self.str1 = tariff.name
-        self.str2 = '(%i)' % (tariff.interval,)
-        self.font1 = QFont("Lucida Grande")
-        self.font2 = QFont("Lucida Grande")
-        self.font1.setBold(True)
-        self.font1.setPixelSize(ITEM_HEIGHT / 2)
-        self.font2.setPixelSize(ITEM_HEIGHT / 2)
-        self.offset = QFontMetrics(self.font1).width(self.str1) + 15
-
-    def boundingRect(self):
-        return QRectF(0, 0, ITEM_WIDTH, ITEM_HEIGHT)
-
-    def paint(self, painter, option, widget):
-        if option.state & QStyle.State_Selected:
-            painter.fillRect(self.boundingRect(), QColor(0, 128, 240))
-            painter.setPen(Qt.white)
-        else:
-            painter.setPen(Qt.lightGray)
-            painter.drawRect(self.boundingRect())
-            painter.setPen(Qt.black)
-        painter.setFont(self.font1)
-        painter.drawText(QRect(10, 0, self.offset, ITEM_HEIGHT),
-                         Qt.AlignVCenter, self.str1)
-        painter.setFont(self.font2)
-        painter.drawText(QRect(self.offset, 0, ITEM_WIDTH, ITEM_HEIGHT),
-                         Qt.AlignVCenter, self.str2)
 
 
 class Payments(QWidget):
@@ -138,7 +114,7 @@ class Payments(QWidget):
 
         self.tariffs = None
         self.payment = None
-        self.scene = None
+        self.ticket = None
 
         self.ui = uic.loadUiType('payments.ui')[0]()
         self.ui.setupUi(self)
@@ -152,67 +128,55 @@ class Payments(QWidget):
         self.ui.cancel.clicked.connect(self.cancel)
         self.ui.pay.clicked.connect(self.pay)
 
-        self.ui.tariffs.setRenderHints(QPainter.TextAntialiasing)
-        self.ui.tariffs.setFrameShape(QFrame.NoFrame)
+        self.ui.tariffs.setSource(QUrl('view.qml'))
+        self.ui.tariffs.setResizeMode(QDeclarativeView.SizeRootObjectToView)
+        self.ui.tariffs.rootObject().tariff_changed.connect(self.handle_current_tariff)
 
-        self.flick = FlickCharm()
-        self.flick.activate_on(self.ui.tariffs)
+        self.ui.cancel.setEnabled(True)
+
+        self.ready_to_handle()
 
     def update_tariffs(self, tariffs):
-        if self.tariffs is None:
-            print 'update_tariffs A', tariffs
-            self.ready_to_handle()
-        else:
-            print 'update_tariffs B'
         self.tariffs = tariffs
+        self.ui.tariffs.rootObject().set_tariffs([tariff for tariff in self.tariffs if tariff.type in [Tariff.ONCE]])
 
     def ready_to_handle(self):
+        self.ticket = None
+        self.ui.tariffs.rootObject().set_tariffs([])
         self.reader.new_ticket.connect(self.handle_ticket)
-        self.ui.cancel.setEnabled(False)
+        self.ui.cancel.setEnabled(True)
         self.ui.pay.setEnabled(False)
 
     def ready_to_pay(self):
-        self.reader.new_ticket.disconnect(self.handle_ticket)
         self.ui.cancel.setEnabled(True)
         self.ui.pay.setEnabled(True)
 
     def handle_ticket(self, ticket):
+        self.reader.new_ticket.disconnect()
         self.ui.bar.setText(ticket.bar)
         self.new_payment.emit()
 
-        self.scene = QGraphicsScene()
-        self.scene.setItemIndexMethod(QGraphicsScene.NoIndex)
+        self.ticket = ticket
+        self.ui.cancel.setEnabled(True)
+        available_tariffs = [tariff for tariff in self.tariffs if tariff.type in [Tariff.FIXED]]
+        self.ui.tariffs.rootObject().set_tariffs(available_tariffs)
 
-        for i, tariff in enumerate(self.tariffs):
-            item = TariffItem(tariff)
-            self.scene.addItem(item)
-            item.setPos(i * ITEM_WIDTH, 0)
-            item.setFlag(QGraphicsItem.ItemIsSelectable, True)
-
-        self.scene.setItemIndexMethod(QGraphicsScene.BspTreeIndex)
-
-        self.ui.tariffs.setScene(self.scene)
-
-        self.scene.setItemIndexMethod(QGraphicsScene.BspTreeIndex)
-
-        self.scene.selectionChanged.connect(lambda: self.handle_ticket_with_current_tariff(ticket))
-
-    def handle_ticket_with_current_tariff(self, ticket):
-        selected = self.scene.selectedItems()
-        if not len(selected):
-            print 'No selection'
-            return
-        tariff = selected[0].tariff
+    def handle_current_tariff(self, tariff):
+        tariff = tariff.toPyObject()
         if not hasattr(tariff, 'calc'):
-            self.ui.explanation.setText('Unsupported tariff.')
+            self.ui.explanation.setText('This tariff is not supported yet\n')
+            self.ui.pay.setEnabled(False)
             return
 
-        self.payment = ticket.pay(tariff)
-        if self.payment:
-            self.ui.explanation.setText(self.payment.explanation())
-            self.ready_to_pay()
+        if self.ticket:
+            self.payment = self.ticket.pay(tariff)
+            if self.payment:
+                self.ui.explanation.setText(self.payment.explanation())
+                self.ready_to_pay()
+            else:
+                self.ui.explanation.setText('Already paid.')
         else:
-            self.ui.explanation.setText('Already paid.')
+            self.ui.explanation.setText(tariff.name)
 
     def pay(self):
         self.reader.payment_processed.connect(self.payment_completed)
@@ -222,6 +186,7 @@ class Payments(QWidget):
         self.ui.progress.setVisible(True)
 
     def cancel(self):
+        self.reader.update_tariffs()
         self.ui.explanation.setText('')
         self.ui.bar.setText('-')
         self.ready_to_handle()

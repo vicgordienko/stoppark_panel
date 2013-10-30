@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='stoppark',
-    version='0.7.56',
+    version='0.8.36',
     author='feanor',
     author_email='std.feanor@gmail.com',
     packages=['stoppark'],
@@ -10,6 +10,7 @@ setup(
        'stoppark': [
            '*.ui',
            '*.png',
+           '*.qml',
            'generate_pot',
            'i18n/ru_RU/LC_MESSAGES/stoppark.mo'],
     },
