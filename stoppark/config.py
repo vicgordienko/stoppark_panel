@@ -20,9 +20,9 @@ QDB.open()
 
 if sys.platform == 'linux2':
     u2py.config.reader_path = [
-        #{'path': '/dev/ttyUSB0', 'baud': 38400, 'parity': 2, 'impl': 'asio-mt' }
+        {'path': '/dev/ttyUSB10', 'baud': 38400, 'parity': 2, 'impl': 'asio-mt'}
         #{'path': '127.0.0.1:1200', 'impl': 'tcp' },
-        {'path': '/tmp/stream', 'impl': 'unix'},
+        #{'path': '/tmp/stream', 'impl': 'unix'},
     ]
 else:
     u2py.config.reader_path = [

@@ -25,15 +25,19 @@ class Reader(QObject):
         try:
             while True:
                 bar = self.sock.recv(128).strip(';?\n\r')
+                if len(bar) < 18:
+                    continue
 
                 ticket = self.db.get_ticket(bar)
                 if not ticket:
-                    Ticket.register(self.db, str(bar))
-                    ticket = self.db.get_ticket(bar)
+                    if Ticket.register(self.db, str(bar)):
+                        ticket = self.db.get_ticket(bar)
+                    else:
+                        continue
 
                 print ticket
 
-                self._update_tariffs()
+                #self._update_tariffs()
                 self.new_ticket.emit(ticket)
 
         except socket.error:
@@ -130,19 +134,21 @@ class Payments(QWidget):
 
         self.ui.tariffs.setSource(QUrl('view.qml'))
         self.ui.tariffs.setResizeMode(QDeclarativeView.SizeRootObjectToView)
-        self.ui.tariffs.rootObject().tariff_changed.connect(self.handle_current_tariff)
+        self.ui.tariffs.rootObject().new_payment.connect(self.handle_payment)
 
         self.ui.cancel.setEnabled(True)
 
-        self.ready_to_handle()
-
     def update_tariffs(self, tariffs):
+        if self.tariffs is None:
+            self.ready_to_accept()
         self.tariffs = tariffs
-        self.ui.tariffs.rootObject().set_tariffs([tariff for tariff in self.tariffs if tariff.type in [Tariff.ONCE]])
+        self.ui.tariffs.rootObject().set_tariffs(self.tariffs)
 
-    def ready_to_handle(self):
+    def ready_to_accept(self):
+        if self.ticket:
+            del self.ticket
         self.ticket = None
-        self.ui.tariffs.rootObject().set_tariffs([])
+        self.ui.tariffs.rootObject().setProperty('ticket', self.ticket)
         self.reader.new_ticket.connect(self.handle_ticket)
         self.ui.cancel.setEnabled(True)
         self.ui.pay.setEnabled(False)
@@ -153,13 +159,15 @@ class Payments(QWidget):
 
     def handle_ticket(self, ticket):
         self.reader.new_ticket.disconnect()
-        self.ui.bar.setText(ticket.bar)
         self.new_payment.emit()
 
         self.ticket = ticket
         self.ui.cancel.setEnabled(True)
-        available_tariffs = [tariff for tariff in self.tariffs if tariff.type in [Tariff.FIXED]]
-        self.ui.tariffs.rootObject().set_tariffs(available_tariffs)
+
+        self.ui.tariffs.rootObject().setProperty('ticket', self.ticket)
+
+    def handle_payment(self, payment):
+        print 'handle_payment', payment
 
     def handle_current_tariff(self, tariff):
         tariff = tariff.toPyObject()
@@ -178,18 +186,15 @@ class Payments(QWidget):
         else:
             self.ui.explanation.setText(tariff.name)
 
+    def cancel(self):
+        self.ready_to_accept()
+
     def pay(self):
         self.reader.payment_processed.connect(self.payment_completed)
         self.reader.pay(self.payment)
         self.ui.pay.setEnabled(False)
         self.ui.cancel.setEnabled(False)
         self.ui.progress.setVisible(True)
-
-    def cancel(self):
-        self.reader.update_tariffs()
-        self.ui.explanation.setText('')
-        self.ui.bar.setText('-')
-        self.ready_to_handle()
 
     def payment_completed(self):
         self.ui.progress.setVisible(False)

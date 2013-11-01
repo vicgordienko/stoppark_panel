@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='stoppark',
-    version='0.8.36',
+    version='0.9.40',
     author='feanor',
     author_email='std.feanor@gmail.com',
     packages=['stoppark'],

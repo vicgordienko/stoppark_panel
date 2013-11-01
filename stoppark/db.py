@@ -1,5 +1,5 @@
 ﻿# coding=utf-8
-from PyQt4.QtCore import pyqtSignal, pyqtProperty, QObject
+from PyQt4.QtCore import pyqtSignal, pyqtSlot, pyqtProperty, QObject
 from gevent import socket
 from datetime import datetime, date, timedelta
 from time import clock as measurement, mktime
@@ -198,20 +198,36 @@ class DB(QObject):
         return self._strings
 
 
-class TicketPayment(object):
+class TicketPayment(QObject):
     def __init__(self, ticket, tariff):
+        QObject.__init__(self)#, parent=ticket)
+
+        self._enabled = hasattr(tariff, 'calc')
+        if not self._enabled:
+            return
+
         self.ticket = ticket
         self.tariff = tariff
 
         self.now = datetime.now()
         self.result = tariff.calc(self.ticket.time_in, self.now)
 
+    def __del__(self):
+        print '~TicketPayment'
+
+    @pyqtProperty(bool)
+    def enabled(self):
+        return self._enabled
+
+    @pyqtProperty(str, constant=True)
     def explanation(self):
+        if not self._enabled:
+            return u'Невозможно оплатить по этому тарифу'
         return u'''
-Оплата по тарифу "%s"
+Оплата по талону %s
 Время вьезда: %s
 %s
-''' % (self.tariff.name, self.ticket.time_in.strftime(DB.DATETIME_FORMAT), self.result)
+''' % (self.ticket.bar, self.ticket.time_in.strftime(DB.DATETIME_FORMAT), self.result)
 
     QUERY = 'update ticket set typetarif=%i, pricetarif=%i * 100, summ=%i * 100, summdopl=0, timeout="%s", status = status | %i where bar="%s"'
 
@@ -221,8 +237,14 @@ class TicketPayment(object):
         return db.query(self.QUERY % args)
 
 
-class TicketExcessPayment(object):
+class TicketExcessPayment(QObject):
     def __init__(self, ticket, tariff, excess=False):
+        QObject.__init__(self, parent=ticket)
+
+        self._enabled = hasattr(tariff, 'calc')
+        if not self._enabled:
+            return
+
         self.ticket = ticket
         self.tariff = tariff
         self.excess = excess
@@ -231,12 +253,18 @@ class TicketExcessPayment(object):
         self.base_time = self.ticket.time_excess_paid if self.excess else self.ticket.time_paid
         self.result = tariff.calc(self.base_time, self.now)
 
+    def __del__(self):
+        print '~TicketExcessPayment'
+
+    @pyqtProperty(str, constant=True)
     def explanation(self):
+        if not self._enabled:
+            return u'Невозможно оплатить по этому тарифу'
         return u'''
-Доплата по тарифу "%s"
+Доплата по талону %s
 Время вьезда: %s
 Время последней оплаты: %s
-%s''' % (self.tariff.name, self.ticket.time_in.strftime(DB.DATETIME_FORMAT),
+%s''' % (self.ticket.bar, self.ticket.time_in.strftime(DB.DATETIME_FORMAT),
                self.base_time.strftime(DB.DATETIME_FORMAT), self.result)
 
     QUERY = 'update ticket set summdopl = summdopl + %i * 100, timedopl="%s", status = status | %i where bar = "%s"'
@@ -246,7 +274,7 @@ class TicketExcessPayment(object):
         return db.query(self.QUERY % args)
 
 
-class Ticket(object):
+class Ticket(QObject):
     IN = 1
     PAID = 5
     OUT = 15
@@ -273,14 +301,19 @@ class Ticket(object):
     @staticmethod
     def register(db, bar):
         query = 'insert into ticket values("%s", NULL, "%s", NULL, NULL, NULL, NULL, "%s", NULL, NULL, NULL, 1)'
-        args = ("Ticket", bar, Ticket.parse_bar(bar).strftime(DB.DATETIME_FORMAT))
+        try:
+            ticket_time = Ticket.parse_bar(bar).strftime(DB.DATETIME_FORMAT)
+        except ValueError:
+            return None
+        args = ("Ticket", bar, ticket_time)
         return db.query(query % args) is None
 
     def __init__(self, fields):
+        QObject.__init__(self)
         self.fields = fields
 
         self.id = fields[1]
-        self.bar = fields[2]
+        self._bar = fields[2]
         self.tariff_type = fields[3]
         self.tariff_price = fields[4]
         self.tariff_sum = fields[5]
@@ -291,6 +324,14 @@ class Ticket(object):
         self.time_excess_paid = datetime.strptime(fields[10], DB.DATETIME_FORMAT) if fields[10] != 'None' else None
         self.status = int(fields[11])
 
+    def __del__(self):
+        print '~Ticket'
+
+    @pyqtProperty(str)
+    def bar(self):
+        return self._bar
+
+    @pyqtSlot(QObject, result=QObject)
     def pay(self, tariff):
         if self.status == self.IN:
             return TicketPayment(self, tariff)
@@ -360,7 +401,7 @@ class Tariff(QObject):
         self.fields = fields
 
         self._id = int(fields[0])
-        self._name = fields[1].decode('utf8')
+        self._title = fields[1].decode('utf8')
         self._type = int(fields[2])
         self._interval = int(fields[3])
         try:
@@ -369,23 +410,34 @@ class Tariff(QObject):
             self.cost = fields[4].split(' ')
         self.zero_time = [int(i, 10) for i in fields[5].split(':')] if fields[5] != 'None' else None
         self.max_per_day = fields[6]
-        self.note = fields[7]
+        self._note = fields[7].decode('utf8')
 
-    @pyqtProperty(int)
+    def __del__(self):
+        print '~Tariff'
+
+    @pyqtProperty(int, constant=True)
     def id(self):
         return self._id
 
-    @pyqtProperty(str)
-    def name(self):
-        return self._name
+    @pyqtProperty(str, constant=True)
+    def title(self):
+        return self._title
 
-    @pyqtProperty(int)
+    @pyqtProperty(int, constant=True)
     def type(self):
         return self._type
 
-    @pyqtProperty(int)
+    @pyqtProperty(int, constant=True)
     def interval(self):
         return self._interval
+
+    @pyqtProperty(str, constant=True)
+    def costInfo(self):
+        return str(self.cost) if isinstance(self.cost, int) else ','.join([str(cost) for cost in self.cost[:3]]) + '...'
+
+    @pyqtProperty(str, constant=True)
+    def note(self):
+        return self._note
 
 
 class TariffResult(object):
@@ -407,10 +459,8 @@ class TariffResult(object):
             self.price += min((self.units % 24)*cost, max_per_day)
 
     def __str__(self):
-        return u"""
-Время, проведенное на парковке: %i д. %i час. %i мин.
-Единиц оплаты: %f
-Стоимость: %i грн.""" % (self.days, self.hours, self.minutes, self.units, self.price)
+        return u"""Единиц оплаты: %f
+Стоимость: %i грн.""" % (self.units, self.price)
 
     def __repr__(self):
         return str((self.days, self.hours, self.minutes, self.units, self.price))
