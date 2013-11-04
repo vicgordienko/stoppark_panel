@@ -1,18 +1,19 @@
+# -*- coding: utf-8 -*-
 from PyQt4 import uic
 from PyQt4.QtCore import QObject, pyqtSignal, QUrl
-from PyQt4.QtGui import QWidget
+from PyQt4.QtGui import QWidget, QIcon, QSystemTrayIcon
 from PyQt4.QtDeclarative import QDeclarativeView
 from gevent import socket, spawn, sleep
 from gevent.queue import Queue
 from threading import Thread
-from db import DB, Ticket, Tariff
-import time
+from db import DB, Ticket
 
 
 class Reader(QObject):
     new_ticket = pyqtSignal(Ticket)
     payment_processed = pyqtSignal()
     tariffs_updated = pyqtSignal(list)
+    notify = pyqtSignal(str, str)
 
     def __init__(self, parent=None):
         QObject.__init__(self, parent)
@@ -62,7 +63,7 @@ class Reader(QObject):
 
     def _loop(self):
         self.queue = Queue()
-        self.db = DB()
+        self.db = DB(notify=lambda title, msg: self.notify.emit(title, msg))
 
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect('/tmp/bar')
@@ -120,12 +121,16 @@ class Payments(QWidget):
         self.payment = None
         self.ticket = None
 
+        self.notifier = QSystemTrayIcon(QIcon('arrow-up-icon.png'), self)
+        self.notifier.show()
+
         self.ui = uic.loadUiType('payments.ui')[0]()
         self.ui.setupUi(self)
-
         self.ui.progress.setVisible(False)
+        self.ui.cancel.setEnabled(True)
 
         self.reader = Reader(self)
+        self.reader.notify.connect(lambda title, msg: self.notifier.showMessage(title, msg))
         self.reader.tariffs_updated.connect(self.update_tariffs)
         self.reader.start()
 
@@ -136,8 +141,6 @@ class Payments(QWidget):
         self.ui.tariffs.setResizeMode(QDeclarativeView.SizeRootObjectToView)
         self.ui.tariffs.rootObject().new_payment.connect(self.handle_payment)
 
-        self.ui.cancel.setEnabled(True)
-
     def update_tariffs(self, tariffs):
         if self.tariffs is None:
             self.ready_to_accept()
@@ -146,7 +149,7 @@ class Payments(QWidget):
 
     def ready_to_accept(self):
         if self.ticket:
-            del self.ticket
+            self.ticket.payments = None
         self.ticket = None
         self.ui.tariffs.rootObject().setProperty('ticket', self.ticket)
         self.reader.new_ticket.connect(self.handle_ticket)
@@ -167,7 +170,13 @@ class Payments(QWidget):
         self.ui.tariffs.rootObject().setProperty('ticket', self.ticket)
 
     def handle_payment(self, payment):
-        print 'handle_payment', payment
+        print 'handle_payment'
+        payment = payment.toPyObject()
+        if payment:
+            self.payment = payment
+            self.ui.pay.setEnabled(payment.enabled)
+        else:
+            self.ui.pay.setEnabled(False)
 
     def handle_current_tariff(self, tariff):
         tariff = tariff.toPyObject()
@@ -194,14 +203,15 @@ class Payments(QWidget):
         self.reader.pay(self.payment)
         self.ui.pay.setEnabled(False)
         self.ui.cancel.setEnabled(False)
+        self.ui.tariffs.setEnabled(False)
         self.ui.progress.setVisible(True)
 
     def payment_completed(self):
         self.ui.progress.setVisible(False)
         self.reader.payment_processed.disconnect(self.payment_completed)
-
-        self.ui.explanation.setText(self.ui.explanation.text() + 'Paid.')
-        self.ready_to_handle()
+        self.notifier.showMessage(u'Оплата', u'Оплата выполнена успешно')
+        self.ui.tariffs.setEnabled(True)
+        self.ready_to_accept()
 
     def stop_reader(self):
         self.reader.stop()

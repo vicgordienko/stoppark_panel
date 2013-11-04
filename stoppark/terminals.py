@@ -1,49 +1,9 @@
 from PyQt4 import uic
-from PyQt4.QtCore import Qt, QSize, pyqtSignal, QEvent, QBasicTimer
+from PyQt4.QtCore import Qt, QSize, pyqtSignal, QEvent
 from PyQt4.QtGui import QWidget, QStyledItemDelegate, QStandardItemModel, QStandardItem
 from PyQt4.QtGui import QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QSpacerItem
-from PyQt4.QtGui import QSizePolicy, QFont, QIcon, QSystemTrayIcon, QGestureRecognizer
+from PyQt4.QtGui import QSizePolicy, QFont, QIcon, QSystemTrayIcon
 from mainloop import Mainloop
-
-
-class MouseTapAndHoldGestureRecognizer(QGestureRecognizer):
-    def __init__(self, gesture_button=Qt.LeftButton):
-        QGestureRecognizer.__init__(self)
-        self.gesture_button = gesture_button
-        self.position = None
-        self.timer = None
-
-    def recognize(self, gesture, watched, event):
-        if event.type() == QEvent.MouseButtonPress and event.button() == self.gesture_button:
-            self.position = event.pos()
-            self.timer = QBasicTimer()
-            self.timer.start(1000, watched)
-            return QGestureRecognizer.MayBeGesture
-
-        if event.type() == QEvent.MouseMove and self.position is not None:
-            if self.exceeds(event.pos()):
-                return QGestureRecognizer.CancelGesture
-
-        if event.type() == QEvent.Timer and self.position is not None:
-            if event.timerId() == self.timer.timerId():
-                return QGestureRecognizer.FinishGesture
-            else:
-                return QGestureRecognizer.CancelGesture
-
-        if event.type() == QEvent.MouseButtonRelease and event.button() == self.gesture_button:
-            if self.position is not None:
-                return QGestureRecognizer.CancelGesture
-
-        return QGestureRecognizer.Ignore
-
-    def exceeds(self, pos):
-        return (pos - self.position).manhattanLength() > 3
-
-    def reset(self, state):
-        self.position = None
-        self.timer.stop()
-        self.timer = None
-        QGestureRecognizer.reset(self, state)
 
 
 class TerminalWidget(QWidget):
@@ -76,9 +36,6 @@ class TerminalWidget(QWidget):
         self.bt_open.clicked.connect(self.open)
         self.bt_close.clicked.connect(self.close)
 
-        #self.tap_and_hold = MouseTapAndHoldGestureRecognizer()
-        #self.tap_and_hold_type = QGestureRecognizer.registerRecognizer(self.tap_and_hold)
-        #self.grabGesture(self.tap_and_hold_type)
         self.grabGesture(Qt.TapAndHoldGesture)
 
     def update_config(self):

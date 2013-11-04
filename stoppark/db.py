@@ -200,7 +200,8 @@ class DB(QObject):
 
 class TicketPayment(QObject):
     def __init__(self, ticket, tariff):
-        QObject.__init__(self)#, parent=ticket)
+        QObject.__init__(self)
+        ticket.payments.append(self)
 
         self._enabled = hasattr(tariff, 'calc')
         if not self._enabled:
@@ -212,12 +213,13 @@ class TicketPayment(QObject):
         self.now = datetime.now()
         self.result = tariff.calc(self.ticket.time_in, self.now)
 
-    def __del__(self):
-        print '~TicketPayment'
-
-    @pyqtProperty(bool)
+    @pyqtProperty(bool, constant=True)
     def enabled(self):
         return self._enabled
+
+    @pyqtProperty(int, constant=True)
+    def price(self):
+        return self.result.price
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
@@ -239,7 +241,8 @@ class TicketPayment(QObject):
 
 class TicketExcessPayment(QObject):
     def __init__(self, ticket, tariff, excess=False):
-        QObject.__init__(self, parent=ticket)
+        QObject.__init__(self)
+        ticket.payments.append(self)
 
         self._enabled = hasattr(tariff, 'calc')
         if not self._enabled:
@@ -253,8 +256,13 @@ class TicketExcessPayment(QObject):
         self.base_time = self.ticket.time_excess_paid if self.excess else self.ticket.time_paid
         self.result = tariff.calc(self.base_time, self.now)
 
-    def __del__(self):
-        print '~TicketExcessPayment'
+    @pyqtProperty(bool, constant=True)
+    def enabled(self):
+        return self._enabled
+
+    @pyqtProperty(int, constant=True)
+    def price(self):
+        return self.result.price
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
@@ -263,7 +271,7 @@ class TicketExcessPayment(QObject):
         return u'''
 Доплата по талону %s
 Время вьезда: %s
-Время последней оплаты: %s
+Последняя оплата: %s
 %s''' % (self.ticket.bar, self.ticket.time_in.strftime(DB.DATETIME_FORMAT),
                self.base_time.strftime(DB.DATETIME_FORMAT), self.result)
 
@@ -272,6 +280,21 @@ class TicketExcessPayment(QObject):
     def execute(self, db):
         args = (self.result.price, self.now.strftime(DB.DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
         return db.query(self.QUERY % args)
+
+
+class TicketPaymentAlreadyPaid(QObject):
+    def __init__(self, ticket, tariff):
+        QObject.__init__(self)
+        ticket.payments.append(self)
+        self.ticket = ticket
+
+    @pyqtProperty(bool, constant=True)
+    def enabled(self):
+        return False
+
+    @pyqtProperty(str, constant=True)
+    def explanation(self):
+        return u'Талон %s уже оплачен.' % (self.ticket.bar,)
 
 
 class Ticket(QObject):
@@ -311,6 +334,7 @@ class Ticket(QObject):
     def __init__(self, fields):
         QObject.__init__(self)
         self.fields = fields
+        self.payments = []
 
         self.id = fields[1]
         self._bar = fields[2]
@@ -346,6 +370,8 @@ class Ticket(QObject):
             if self.time_paid:
                 if (datetime.now() - self.time_paid).total_seconds() > self.EXCESS_INTERVAL:
                     return TicketExcessPayment(self, tariff)
+
+        return TicketPaymentAlreadyPaid(self, tariff)
 
     def check(self):
         if self.status == self.IN:
@@ -439,6 +465,10 @@ class Tariff(QObject):
     def note(self):
         return self._note
 
+    @pyqtProperty(str, constant=True)
+    def zeroTime(self):
+        return self.zero_time if self.zero_time else u'не указано'
+
 
 class TariffResult(object):
     def __init__(self, delta, units=0, cost=0, max_per_day=None):
@@ -459,8 +489,7 @@ class TariffResult(object):
             self.price += min((self.units % 24)*cost, max_per_day)
 
     def __str__(self):
-        return u"""Единиц оплаты: %f
-Стоимость: %i грн.""" % (self.units, self.price)
+        return u'Единиц оплаты: %f' % (self.units,)
 
     def __repr__(self):
         return str((self.days, self.hours, self.minutes, self.units, self.price))
@@ -506,6 +535,16 @@ class FixedTariff(Tariff):
             return TariffResult(end - begin, result.units + unit_diff, self.cost)
         else:
             return self._calc_a(begin, end)
+
+
+@Tariff.register(Tariff.ONCE)
+class OnceTariff(Tariff):
+    def __init__(self, fields):
+        super(OnceTariff, self).__init__(fields)
+
+    def execute(self):
+        print 'OnceTariff.execute'
+
 
 
 class Card(object):
