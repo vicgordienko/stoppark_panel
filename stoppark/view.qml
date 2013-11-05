@@ -26,9 +26,7 @@ Rectangle {
     function emit_current_payment() {
         if(list.currentIndex != -1) {
             var item = model.get(list.currentIndex)
-            if(!item.payment) {
-                new_payment(item.payment)
-            }
+            new_payment(item.payment)
         } else {
             new_payment(null)
         }
@@ -42,56 +40,96 @@ Rectangle {
         emit_current_payment()
     }
 
-    Rectangle {
+    /*Rectangle {
         anchors.top: list.bottom
+        anchors.topMargin: 7
         anchors.horizontalCenter: parent.horizontalCenter
 
-        height: parent.height - list.height
-        width: parent.width
+        height: parent.height - list.height - 10
+        width: parent.width - 5
+
+        radius: 10
+        border.width: 1
+        border.color: "black"
+
+        Behavior on color {
+            ColorAnimation {
+                duration: 500
+            }
+        }
+
+        property variant item: list.currentIndex != -1 ? model.get(list.currentIndex) : null
+
+        onItemChanged: {
+            title.text = item ? item.tariff.title : ''
+            if(item && item.payment && item.payment.enabled) {
+                price_prefix.text = 'К оплате: '
+                price.text = item.payment.price + ' грн.'
+                color = 'lightgreen'
+            } else {
+                price_prefix.text = ''
+                price.text = ''
+                color = '#ff0c0c'
+            }
+        }
+
+        MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    list.positionViewAtIndex(list.currentIndex, ListView.Center)
+                }
+            }
 
         Text {
+            id: title
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-
-            text: 'Тариф: ' + model.get(list.currentIndex).tariff.title
-            font.pointSize: 25
+            font.pointSize: 22
         }
 
         Text {
-            anchors.right: parent.right
+            id: price_prefix
+            anchors.right: price.left
             anchors.verticalCenter: parent.verticalCenter
-
-            text: list.currentIndex != -1 ? 'Сумма к оплате: ' + model.get(list.currentIndex).payment.price : ''
-            font.pointSize: 25
+            font.pointSize: 20
         }
-    }
+
+        Text {
+            id: price
+             anchors.right: parent.right
+             anchors.verticalCenter: parent.verticalCenter
+             font.pointSize: 24
+        }
+    }*/
 
     ListView {
         id: list
         anchors.top: parent.top
-        width: parent.width
+        width: parent.width - 5
 
-        height: 245
+        height: parent.height - 5
 
+        clip: true
         focus: true
-        orientation: ListView.Horizontal
+        orientation: ListView.Vertical
 
         model: ListModel {
               id: model
         }
 
         onCurrentIndexChanged: {
+            console.log('onCurrentIndexChanged', currentIndex)
             emit_current_payment()
         }
 
         highlightMoveDuration: 500
-        highlightFollowsCurrentItem: false
+        /*highlightFollowsCurrentItem: false
         highlight: Rectangle {
-            color: "lightgreen"
+            color: "lightsteelblue"
             radius: list.currentItem ? list.currentItem.radius: 0
             width: list.currentItem ? list.currentItem.width: 0
             height: list.currentItem ? list.currentItem.height: 0
-            border.width: 10
+            border.width: 5
 
             x: list.currentItem ? list.currentItem.x : 0
             Behavior on x {
@@ -100,26 +138,94 @@ Rectangle {
                         damping: 0.2
                 }
             }
-        }
+
+            y: list.currentItem ? list.currentItem.y : 0
+            Behavior on y {
+                SpringAnimation {
+                        spring: 3
+                        damping: 0.2
+                }
+            }
+        }*/
 
         delegate: Rectangle {
             id: rect
 
-            height: parent.height
-            width: widget.width
-
-            color: "transparent"
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: {
-                    list.currentIndex = index
-                }
-            }
+            height: 80
+            width: parent.width - 2 * border.width
 
             radius: 15
             border.color: "black"
             border.width: 1
+            color: "transparent"
+
+            property real detailsOpacity
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    console.log('clicked')
+                    if(rect.state == "Details") {
+                        list.currentIndex = -1
+                        rect.state = ''
+                    } else {
+                        list.currentIndex = index
+                        rect.state = 'Details'
+                    }
+                }
+            }
+
+            states: State {
+                name: "Details"
+
+                PropertyChanges { target: rect; color: "lightsteelblue" }
+                PropertyChanges { target: rect; height: widget.height - 5 }
+                PropertyChanges { target: rect; detailsOpacity: 1 }
+                PropertyChanges { target: list; interactive: false }
+                PropertyChanges { target: list; explicit: true; contentY: rect.y }
+            }
+
+            transitions: Transition {
+                ParallelAnimation {
+                    ColorAnimation { property: "color"; duration: 500 }
+                    NumberAnimation { duration: 300; properties: "detailsOpacity,x,contentY,height,width" }
+                }
+            }
+
+            /*Rectangle {
+                id: back
+                opacity: 0
+                anchors.top: parent.top
+                anchors.topMargin: 10
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                width: label.width + 20; height: label.height + 6
+                smooth: true
+                radius: 10
+
+                gradient: Gradient {
+                    GradientStop { id: gradientStop; position: 0.0; color: palette.light }
+                    GradientStop { position: 1.0; color: palette.button }
+                }
+
+                SystemPalette { id: palette }
+
+                MouseArea {
+                    id: mouseArea
+                    anchors.fill: parent
+                    onClicked: {
+                        rect.state = ''
+                        list.currentIndex = -1
+                    }
+                }
+
+                Text {
+                    id: label
+                    text: 'Назад'
+                    anchors.centerIn: parent
+                }
+            }*/
+
 
             Text {
                 id: title
@@ -168,11 +274,13 @@ Rectangle {
                 anchors.rightMargin: 10
                 anchors.top: price_info.bottom
 
-                text: tariff.zeroTime ? 'Расчетное время: ' + tariff.zeroTime : ''
+                text: tariff.zeroTime != '' ? 'Расчетное время: ' + tariff.zeroTime : ''
                 font.pointSize: 16
             }
 
             Text {
+                id: explanation
+                opacity: detailsOpacity
                 text: payment ? payment.explanation : ''
                 font.pointSize: 16
                 anchors.left: parent.left
@@ -183,6 +291,7 @@ Rectangle {
 
             Text {
                 id: price
+                opacity: detailsOpacity
                 text: payment && payment.enabled ? 'К оплате: ' + payment.price + ' грн.': ''
                 font.pointSize: 20
                 anchors.right: parent.right

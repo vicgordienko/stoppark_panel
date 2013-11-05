@@ -467,7 +467,7 @@ class Tariff(QObject):
 
     @pyqtProperty(str, constant=True)
     def zeroTime(self):
-        return self.zero_time if self.zero_time else u'не указано'
+        return ':'.join(['%02i' % (t,) for t in self.zero_time]) if self.zero_time else u''
 
 
 class TariffResult(object):

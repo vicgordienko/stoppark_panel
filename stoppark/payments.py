@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 from PyQt4 import uic
 from PyQt4.QtCore import QObject, pyqtSignal, QUrl
-from PyQt4.QtGui import QWidget, QIcon, QSystemTrayIcon
+from PyQt4.QtGui import QWidget, QIcon, QSystemTrayIcon, QDialog
 from PyQt4.QtDeclarative import QDeclarativeView
+from keyboard import TicketInput
 from gevent import socket, spawn, sleep
 from gevent.queue import Queue
 from threading import Thread
@@ -21,6 +22,7 @@ class Reader(QObject):
         self.db = None
         self.sock = None
         self.queue = None
+        self._ticket = None
 
     def _reader(self):
         try:
@@ -29,20 +31,18 @@ class Reader(QObject):
                 if len(bar) < 18:
                     continue
 
-                ticket = self.db.get_ticket(bar)
-                if not ticket:
-                    if Ticket.register(self.db, str(bar)):
-                        ticket = self.db.get_ticket(bar)
-                    else:
-                        continue
-
-                print ticket
-
-                #self._update_tariffs()
-                self.new_ticket.emit(ticket)
-
+                self._handle_bar(bar)
         except socket.error:
             print 'reader completed'
+
+    def _handle_bar(self, bar):
+        print '_handle_bar'
+        self._ticket = self.db.get_ticket(bar)
+        if not self._ticket:
+            print 'registering ticket'
+            if Ticket.register(self.db, str(bar)):
+                self._ticket = self.db.get_ticket(bar)
+        self.new_ticket.emit(self._ticket)
 
     def _process_payment(self, payment):
         payment.execute(self.db)
@@ -78,8 +78,11 @@ class Reader(QObject):
             action = self.queue.get()
 
             if action is not None:
-                if action == 'tariffs':
-                    self._update_tariffs()
+                if isinstance(action, str):
+                    if action == 'tariffs':
+                        self._update_tariffs()
+                    if action.startswith('bar:'):
+                        self._handle_bar(action[4:])
                 else:
                     self._process_payment(action)
             else:
@@ -91,6 +94,12 @@ class Reader(QObject):
 
     def start(self):
         self.thread.start()
+
+    def handle_bar(self, bar):
+        if self.queue:
+            self.queue.put('bar:' + bar)
+        else:
+            print 'There is no queue to handle barcode.'
 
     def update_tariffs(self):
         if self.queue:
@@ -134,12 +143,18 @@ class Payments(QWidget):
         self.reader.tariffs_updated.connect(self.update_tariffs)
         self.reader.start()
 
+        self.ui.keyboard.clicked.connect(self.manual_ticket_input)
         self.ui.cancel.clicked.connect(self.cancel)
         self.ui.pay.clicked.connect(self.pay)
 
         self.ui.tariffs.setSource(QUrl('view.qml'))
         self.ui.tariffs.setResizeMode(QDeclarativeView.SizeRootObjectToView)
         self.ui.tariffs.rootObject().new_payment.connect(self.handle_payment)
+
+    def manual_ticket_input(self):
+        ticket_input = TicketInput()
+        if ticket_input.exec_() == QDialog.Accepted:
+            self.reader.handle_bar(ticket_input.bar)
 
     def update_tariffs(self, tariffs):
         if self.tariffs is None:
@@ -155,6 +170,7 @@ class Payments(QWidget):
         self.reader.new_ticket.connect(self.handle_ticket)
         self.ui.cancel.setEnabled(True)
         self.ui.pay.setEnabled(False)
+        self.ui.keyboard.setEnabled(True)
 
     def ready_to_pay(self):
         self.ui.cancel.setEnabled(True)
@@ -166,6 +182,7 @@ class Payments(QWidget):
 
         self.ticket = ticket
         self.ui.cancel.setEnabled(True)
+        self.ui.keyboard.setEnabled(False)
 
         self.ui.tariffs.rootObject().setProperty('ticket', self.ticket)
 
