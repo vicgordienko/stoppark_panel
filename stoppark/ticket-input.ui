@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>530</width>
-    <height>133</height>
+    <height>123</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -22,6 +22,9 @@
         <font>
          <pointsize>18</pointsize>
         </font>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: #FFBBBB</string>
        </property>
        <property name="placeholderText">
         <string>Введите баркод</string>
@@ -70,6 +73,9 @@
      </item>
      <item>
       <widget class="QPushButton" name="ok">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <property name="minimumSize">
         <size>
          <width>150</width>

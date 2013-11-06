@@ -152,9 +152,11 @@ class Payments(QWidget):
         self.ui.tariffs.rootObject().new_payment.connect(self.handle_payment)
 
     def manual_ticket_input(self):
+        self.reader.new_ticket.disconnect()
         ticket_input = TicketInput()
         if ticket_input.exec_() == QDialog.Accepted:
             self.reader.handle_bar(ticket_input.bar)
+        self.reader.new_ticket.connect(self.handle_ticket)
 
     def update_tariffs(self, tariffs):
         if self.tariffs is None:

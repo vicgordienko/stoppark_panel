@@ -1,6 +1,7 @@
 from subprocess import Popen
 from PyQt4 import uic
 from PyQt4.QtGui import QLineEdit, QDialog
+from db import Ticket
 
 
 class Keyboard(object):
@@ -34,6 +35,7 @@ class TicketInput(QDialog):
         self.ui.ok.clicked.connect(self.ok)
         self.ui.cancel.clicked.connect(self.cancel)
         self.ui.keyboard.clicked.connect(self.show_keyboard)
+        self.ui.bar.textChanged.connect(self.bar_changed)
 
         self.show_keyboard()
 
@@ -44,6 +46,17 @@ class TicketInput(QDialog):
     @property
     def bar(self):
         return str(self.ui.bar.text())
+
+    def bar_changed(self, bar):
+        bar = str(bar)
+        try:
+            assert(len(bar) == 18)
+            Ticket.parse_bar(bar)
+            self.ui.ok.setEnabled(True)
+            self.ui.bar.setStyleSheet('background-color: #bbffbb')
+        except (ValueError, AssertionError):
+            self.ui.ok.setEnabled(False)
+            self.ui.bar.setStyleSheet('background-color: #ffbbbb')
 
     def ok(self):
         self.accept()
