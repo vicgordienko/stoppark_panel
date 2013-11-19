@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import re
+from threading import Thread
 from PyQt4 import uic
 from PyQt4.QtCore import QObject, pyqtSignal, QUrl
 from PyQt4.QtGui import QWidget, QIcon, QSystemTrayIcon, QDialog
@@ -6,7 +8,6 @@ from PyQt4.QtDeclarative import QDeclarativeView
 from keyboard import TicketInput
 from gevent import socket, spawn, sleep
 from gevent.queue import Queue
-from threading import Thread
 from db import DB, Ticket
 
 
@@ -25,13 +26,28 @@ class Reader(QObject):
         self._ticket = None
 
     def _reader(self):
+        bar_regex = re.compile(r'(;(\d+)\?\r\n)')
+        buf = ''
         try:
             while True:
-                bar = self.sock.recv(128).strip(';?\n\r')
-                if len(bar) < 18:
-                    continue
+                new_portion = self.sock.recv(128)
+                if new_portion == '':
+                    print 'fukoda'
+                    self.sock.close()
+                    return
+                buf += new_portion
+                print 'buf', buf
 
-                self._handle_bar(bar)
+                last_index = 0
+                for match in bar_regex.finditer(buf):
+                    last_index = match.span()[1]
+                    bar = match.group(2)
+                    if len(bar) < 18:
+                        continue
+
+                    self._handle_bar(bar)
+
+                buf = buf[last_index:]
         except socket.error:
             print 'reader completed'
 

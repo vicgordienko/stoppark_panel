@@ -294,9 +294,11 @@ terminal_show_message = load('terminal_show_message', (Terminal, c_uint8, c_char
 
 if __name__ == '__main__':
     import config
+    from db import DB
+    db = DB()
 
     config.setup_logging()
 
     t = Terminal()
 
-    terminal_set_state(t, 0, TerminalState('auto', 'open'))
+    TerminalStrings(db).set(t, 2)
