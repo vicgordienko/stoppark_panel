@@ -9,7 +9,42 @@ from keyboard import TicketInput
 from gevent import socket, spawn, sleep
 from gevent.queue import Queue
 from db import DB, Ticket
+from datetime import datetime
 
+
+class SafeSocket(object):
+    def __init__(self, peer):
+        self.sock = None
+        self.peer = peer
+        self.reconnect()
+
+    def reconnect(self):
+        print 'safe_recv auto reconnect started'
+        if self.sock is not None:
+            self.sock.close()
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        while True:
+            print 'reconnect iteration'
+            try:
+                self.sock.connect(self.peer)
+                break
+            except socket.error:
+                sleep(2)
+                continue
+
+    def recv(self, *args):
+        while True:
+            try:
+                data = self.sock.recv(*args)
+                if data == '':
+                    self.reconnect()
+                else:
+                    return data
+            except socket.error:
+                self.reconnect()
+
+    def send(self, *args):
+        return self.sock.send(*args)
 
 class Reader(QObject):
     new_ticket = pyqtSignal(Ticket)
@@ -21,35 +56,41 @@ class Reader(QObject):
         QObject.__init__(self, parent)
         self.thread = Thread(target=self._loop)
         self.db = None
-        self.sock = None
         self.queue = None
+        self.display_queue = None
         self._ticket = None
 
-    def _reader(self):
+    def _reader_loop(self):
         bar_regex = re.compile(r'(;(\d+)\?\r\n)')
+        sock = SafeSocket('/tmp/bar')
         buf = ''
-        try:
-            while True:
-                new_portion = self.sock.recv(128)
-                if new_portion == '':
-                    print 'fukoda'
-                    self.sock.close()
-                    return
-                buf += new_portion
-                print 'buf', buf
+        while True:
+            buf += sock.recv(128)
+            print 'buf', buf
 
-                last_index = 0
-                for match in bar_regex.finditer(buf):
-                    last_index = match.span()[1]
-                    bar = match.group(2)
-                    if len(bar) < 18:
-                        continue
+            last_index = 0
+            for match in bar_regex.finditer(buf):
+                last_index = match.span()[1]
+                bar = match.group(2)
+                if len(bar) < 18:
+                    continue
 
-                    self._handle_bar(bar)
+                self._handle_bar(bar)
 
-                buf = buf[last_index:]
-        except socket.error:
-            print 'reader completed'
+            buf = buf[last_index:]
+
+    def _display_loop(self):
+        sock = SafeSocket('/tmp/screen')
+        sock.send('\x1b\x40')
+        while True:
+            now = datetime.now()
+            self._display(sock, 0, now.strftime('%x'))
+            self._display(sock, 1, now.strftime('%X'))
+            sleep(1)
+
+    def _display(self, sock, line, message):
+        message += ' '*(20 - len(message))
+        sock.send('\x1b\x51' + ('\x42' if line else '\x41') + message + '\x0d')
 
     def _handle_bar(self, bar):
         print '_handle_bar'
@@ -61,13 +102,10 @@ class Reader(QObject):
         self.new_ticket.emit(self._ticket)
 
     def _process_payment(self, payment):
-        payment.execute(self.db)
-        self.payment_processed.emit()
-
-    @staticmethod
-    def _job():
-        while True:
-            sleep(2)
+        try:
+            payment.execute(self.db)
+        finally:
+            self.payment_processed.emit()
 
     def _tariff_updater(self):
         while True:
@@ -77,15 +115,18 @@ class Reader(QObject):
     def _update_tariffs(self):
         self.tariffs_updated.emit(self.db.get_tariffs())
 
+    @staticmethod
+    def _job():
+        while True:
+            sleep(1)
+
     def _loop(self):
         self.queue = Queue()
         self.db = DB(notify=lambda title, msg: self.notify.emit(title, msg))
 
-        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock.connect('/tmp/bar')
-
         spawn(self._job)
-        spawn(self._reader)
+        spawn(self._reader_loop)
+        spawn(self._display_loop)
         #spawn(self._tariff_updater)
 
         self._update_tariffs()
@@ -94,13 +135,8 @@ class Reader(QObject):
             action = self.queue.get()
 
             if action is not None:
-                if isinstance(action, str):
-                    if action == 'tariffs':
-                        self._update_tariffs()
-                    if action.startswith('bar:'):
-                        self._handle_bar(action[4:])
-                else:
-                    self._process_payment(action)
+                if callable(action):
+                    action()
             else:
                 print 'got None'
                 #[greenlet.kill() for greenlet in greenlets]
@@ -112,28 +148,20 @@ class Reader(QObject):
         self.thread.start()
 
     def handle_bar(self, bar):
-        if self.queue:
-            self.queue.put('bar:' + bar)
-        else:
-            print 'There is no queue to handle barcode.'
+        self.queue.put(lambda: self._handle_bar(bar))
 
     def update_tariffs(self):
-        if self.queue:
-            self.queue.put('tariffs')
-        else:
-            print 'There is no queue to update tariffs.'
+        self.queue.put(lambda: self._update_tariffs())
 
     def pay(self, payment):
-        if self.queue:
-            self.queue.put(payment)
-        else:
-            print 'There is no queue to put payments.'
+        self.queue.put(lambda: self._process_payment(payment))
+
+    def display(self, message):
+        self.display_queue.put(message)
 
     def stop(self):
-        if self.queue is not None:
-            self.queue.put(None)
-        else:
-            print 'Already stopped'
+        self.queue.put(None)
+
 
 
 class Payments(QWidget):
