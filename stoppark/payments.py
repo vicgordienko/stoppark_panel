@@ -7,7 +7,7 @@ from PyQt4.QtGui import QWidget, QIcon, QSystemTrayIcon, QDialog
 from PyQt4.QtDeclarative import QDeclarativeView
 from keyboard import TicketInput
 from gevent import socket, spawn, sleep
-from gevent.queue import Queue
+from gevent.queue import Queue, Empty
 from db import DB, Ticket
 from datetime import datetime
 
@@ -44,7 +44,11 @@ class SafeSocket(object):
                 self.reconnect()
 
     def send(self, *args):
-        return self.sock.send(*args)
+        while True:
+            try:
+                return self.sock.send(*args)
+            except socket.error:
+                self.reconnect()
 
 class Reader(QObject):
     new_ticket = pyqtSignal(Ticket)
@@ -79,18 +83,34 @@ class Reader(QObject):
 
             buf = buf[last_index:]
 
-    def _display_loop(self):
-        sock = SafeSocket('/tmp/screen')
-        sock.send('\x1b\x40')
+    def _display_time_loop(self, sock):
         while True:
             now = datetime.now()
-            self._display(sock, 0, now.strftime('%x'))
-            self._display(sock, 1, now.strftime('%X'))
+            self._display(sock, [now.strftime('      %x'), now.strftime('      %X')])
             sleep(1)
 
-    def _display(self, sock, line, message):
-        message += ' '*(20 - len(message))
-        sock.send('\x1b\x51' + ('\x42' if line else '\x41') + message + '\x0d')
+    def _display_loop(self):
+        self.display_queue = Queue()
+        sock = SafeSocket('/tmp/screen')
+        # '\x02\x05\x53\x3c\x03' set russian character set, optional for previously configured display
+        sock.send('\x1b\x40' '\x0c')  # initialize display and clear screen
+        time_loop = spawn(self._display_time_loop, sock)
+        while True:
+            messages = self.display_queue.get()
+            if messages is None:
+                if time_loop is None:
+                    time_loop = spawn(self._display_time_loop, sock)
+            else:
+                if time_loop is not None:
+                    time_loop.kill()
+                    time_loop = None
+                self._display(sock, messages)
+
+    @staticmethod
+    def _display(sock, messages):
+        messages = [message.decode('utf8').encode('cp866') for message in messages]
+        # set cursor at given position and send each message
+        [sock.send('\x1b\x6c\x01' + chr(i+1) + message + ' '*(20 - len(message))) for i, message in enumerate(messages)]
 
     def _handle_bar(self, bar):
         print '_handle_bar'
@@ -238,7 +258,12 @@ class Payments(QWidget):
         if payment:
             self.payment = payment
             self.ui.pay.setEnabled(payment.enabled)
+            if payment.enabled:
+                self.reader.display(['Оплата', 'Цена: ' + str(self.payment.price)])
+            else:
+                self.reader.display(None)
         else:
+            self.reader.display(None)
             self.ui.pay.setEnabled(False)
 
     def handle_current_tariff(self, tariff):
