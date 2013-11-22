@@ -204,8 +204,14 @@ class TerminalBarcode(DumpableStructure):
             return False
 
         if self.status == self.BAR_READ:
-            print self
-            print mainloop.db.get_ticket(self.code)
+            ticket = mainloop.db.get_ticket(self.code)
+            if ticket and ticket.check():
+                mainloop.notify.emit(_('BAR Access permitted.'), u'%s' % (ticket.bar,))
+                TerminalState('man', 'out_open').set(terminal, self.addr, mainloop.db)
+                TerminalMessage(_('BAR Access permitted.')).set(terminal, self.addr)
+            else:
+                mainloop.notify.emit(_('BAR Access denied.'), u'%s' % (ticket.bar,))
+                TerminalMessage(_('BAR Access denied.')).set(terminal, self.addr)
 
         return True
 
@@ -295,10 +301,10 @@ terminal_show_message = load('terminal_show_message', (Terminal, c_uint8, c_char
 if __name__ == '__main__':
     import config
     from db import DB
-    db = DB()
+    d = DB()
 
     config.setup_logging()
 
     t = Terminal()
 
-    TerminalStrings(db).set(t, 2)
+    TerminalStrings(d).set(t, 2)

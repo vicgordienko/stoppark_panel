@@ -378,14 +378,13 @@ class Ticket(QObject):
             return False
 
         if self.status == self.PAID:
-            time_paid, time_excess_paid = (
-                mktime(datetime.strptime(self.time_paid, DB.DATETIME_FORMAT).timetuple()),
-                mktime(datetime.strptime(self.time_excess_paid, DB.DATETIME_FORMAT).timetuple())
-            )
+            now = datetime.now()
 
-            now = mktime(datetime.now().timetuple())
-            if now - time_paid < self.EXCESS_INTERVAL or now - time_excess_paid < self.EXCESS_INTERVAL:
-                return True
+            if self.time_paid:
+                if (now - self.time_paid).total_seconds() < self.EXCESS_INTERVAL:
+                    return True
+                elif self.time_excess_paid and (now - self.time_excess_paid).total_seconds() < self.EXCESS_INTERVAL:
+                    return True
 
 
 class Tariff(QObject):
@@ -544,7 +543,6 @@ class OnceTariff(Tariff):
 
     def execute(self):
         print 'OnceTariff.execute'
-
 
 
 class Card(object):

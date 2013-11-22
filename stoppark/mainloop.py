@@ -43,7 +43,6 @@ class Mainloop(QObject):
         terminal = Terminal()
         if not terminal.is_open():
             self.notify.emit(u'Ошибка', u'Нет связи с концентратором')
-            #self.notify.emit('Terminal error', 'No terminal')
             self.ready.emit(False, {})
             return
 
@@ -54,7 +53,6 @@ class Mainloop(QObject):
 
         if not devices:
             self.notify.emit(u'Ошибка', u'Нет информации о терминалах')
-            #self.notify.emit('Terminal error', 'No devices')
             self.ready.emit(False, {})
             return
 

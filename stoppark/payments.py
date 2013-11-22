@@ -93,7 +93,7 @@ class Reader(QObject):
         self.display_queue = Queue()
         sock = SafeSocket('/tmp/screen')
         # '\x02\x05\x53\x3c\x03' set russian character set, optional for previously configured display
-        sock.send('\x1b\x40' '\x0c')  # initialize display and clear screen
+        sock.send('\x1b\x40' '\x02\x05\x53\x3c\x03' '\x0c')  # initialize display and clear screen
         time_loop = spawn(self._display_time_loop, sock)
         while True:
             messages = self.display_queue.get()
@@ -181,7 +181,6 @@ class Reader(QObject):
 
     def stop(self):
         self.queue.put(None)
-
 
 
 class Payments(QWidget):
