@@ -7,7 +7,7 @@ from PyQt4.QtGui import QWidget, QIcon, QSystemTrayIcon, QDialog
 from PyQt4.QtDeclarative import QDeclarativeView
 from keyboard import TicketInput
 from gevent import socket, spawn, sleep
-from gevent.queue import Queue, Empty
+from gevent.queue import Queue
 from db import DB, Ticket
 from datetime import datetime
 

@@ -3,9 +3,14 @@ from PyQt4 import uic
 from PyQt4.QtCore import Qt, QVariant, QSize, QEvent
 from PyQt4.QtGui import QDialog, QFont, QHeaderView, QStyledItemDelegate
 from PyQt4.QtGui import QApplication, QStyle, QStyleOptionViewItem, QColor
-from PyQt4.QtSql import QSqlTableModel
-from config import QDB
+from PyQt4.QtSql import QSqlTableModel, QSqlDatabase
+from config import db_filename
 
+
+#noinspection PyCallByClass,PyTypeChecker
+QDB = QSqlDatabase.addDatabase("QSQLITE")
+QDB.setDatabaseName(db_filename)
+QDB.open()
 
 class CenteredCheckBoxDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):

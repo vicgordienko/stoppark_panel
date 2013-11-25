@@ -6,7 +6,6 @@ from interface import TerminalCounters, TerminalStrings, TerminalTime, TerminalM
 from PyQt4.QtCore import QObject, pyqtSignal
 from db import DB
 from threading import Thread
-from datetime import datetime
 
 
 def device_loop(terminal, mainloop, addr):

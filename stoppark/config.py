@@ -1,7 +1,7 @@
 import u2py.config
 import sys
 import os
-from PyQt4.QtSql import QSqlDatabase
+
 
 u2py.config.raise_on_io_error = False
 
@@ -12,11 +12,7 @@ if not os.path.exists(stoppark_dir):
     os.makedirs(stoppark_dir)
 
 u2py.config.db_filename = os.path.join(stoppark_dir, 'db')
-
-#noinspection PyCallByClass,PyTypeChecker
-QDB = QSqlDatabase.addDatabase("QSQLITE")
-QDB.setDatabaseName(u2py.config.db_filename)
-QDB.open()
+db_filename = u2py.config.db_filename
 
 if sys.platform == 'linux2':
     u2py.config.reader_path = [
@@ -28,6 +24,9 @@ else:
     u2py.config.reader_path = [
         {'path': '\\\\.\\COM4', 'baud': 38400, 'parity': 2, 'impl': 'asio-mt'}
     ]
+
+DATETIME_FORMAT = '%y-%m-%d %H:%M:%S'
+
 
 def setup_logging(handler=None):
     if handler is None:
