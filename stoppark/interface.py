@@ -137,21 +137,21 @@ class TerminalReader(DumpableStructure):
     def process(self, terminal, addr, direction, mainloop):
         if self.status == self.CARD_READ and self.time < self.TIMEOUT:
             card = mainloop.db.get_card(self.sn)
-            mainloop.notify.emit(_('Card at terminal'), u'%s' % (card.fio()))
+            mainloop.notify.emit(_('Card at terminal'), u'%s' % (card.fio,))
             if card and card.check(direction):
-                mainloop.notify.emit(_('Access permitted.'), u'%s' % (card.fio()))
+                mainloop.notify.emit(_('Access permitted.'), u'%s' % (card.fio,))
                 TerminalState('man', 'in_open').set(terminal, addr, mainloop.db)
                 TerminalMessage(_('Access permitted.')).set(terminal, addr)
             else:
-                mainloop.notify.emit(_('Access denied.'), u'%s' % (card.fio()))
+                mainloop.notify.emit(_('Access denied.'), u'%s' % (card.fio,))
                 TerminalMessage(_('Access denied.')).set(terminal, addr)
         if self.status == self.CARD_IN:
             card = mainloop.db.get_card(self.sn)
-            mainloop.notify.emit(_('Car inside'), u'%s' % (card.fio()))
+            mainloop.notify.emit(_('Car inside'), u'%s' % (card.fio,))
             card.moved(mainloop.db, addr, inside=True)
         if self.status == self.CARD_OUT:
             card = mainloop.db.get_card(self.sn)
-            mainloop.notify.emit(_('Car outside'), u'%s' % (card.fio()))
+            mainloop.notify.emit(_('Car outside'), u'%s' % (card.fio,))
             card.moved(mainloop.db, addr, inside=False)
 
 
@@ -194,6 +194,8 @@ class TerminalBarcode(DumpableStructure):
     BAR_LEFT = 0x01
     BAR_NO = 0x02
 
+    TIMEOUT = 40
+
     #noinspection PyMissingConstructor
     def __init__(self, addr):
         self.addr = addr
@@ -203,7 +205,7 @@ class TerminalBarcode(DumpableStructure):
         if ret != 0 and ret != 0xe0214de:
             return False
 
-        if self.status == self.BAR_READ:
+        if self.status == self.BAR_READ and self.time < self.TIMEOUT:
             ticket = mainloop.db.get_ticket(self.code)
             if ticket and ticket.check():
                 mainloop.notify.emit(_('BAR Access permitted.'), u'%s' % (ticket.bar,))
@@ -213,7 +215,7 @@ class TerminalBarcode(DumpableStructure):
                 mainloop.notify.emit(_('BAR Access denied.'), u'%s' % (ticket.bar,))
                 TerminalMessage(_('BAR Access denied.')).set(terminal, self.addr)
 
-        if self.status == self.BAR_LEFT:
+        if self.status == self.BAR_LEFT and self.time < self.TIMEOUT:
             ticket = mainloop.db.get_ticket(self.code)
             if ticket and ticket.check():
                 mainloop.notify.emit(_('BAR Left'), u'%s' % (ticket.bar,))

@@ -1,7 +1,8 @@
 # coding=utf-8
 from PyQt4.QtCore import QObject, pyqtProperty, pyqtSlot
 from datetime import datetime
-from config import DATETIME_FORMAT
+from config import DATETIME_FORMAT, DATETIME_USER_FORMAT
+from tariff import Tariff
 
 
 class TicketPayment(QObject):
@@ -30,18 +31,22 @@ class TicketPayment(QObject):
     @pyqtProperty(str, constant=True)
     def explanation(self):
         if not self._enabled:
-            return u'Невозможно оплатить по этому тарифу'
+            return u'!Талон %s.\nНевозможно оплатить по этому тарифу.' % (self.ticket.bar,)
         return u'''
 Оплата по талону %s
 Время вьезда: %s
 %s
-''' % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_FORMAT), self.result)
+''' % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT), self.result)
 
     TICKET_QUERY = '''update ticket
 set typetarif=%i, pricetarif=%i * 100, summ=%i * 100, summdopl=0, timecount="%s", status = status | %i
 where bar="%s"'''
 
-    PAYMENT_QUERY = 'insert into payment values(NULL,"%s",%i,%i,"%s","%s","%s",%i,%i,%i*100,%i,"%s","%s",%i*100)'
+    def vfcd_explanation(self):
+        return [
+            u'%i грн/%s' % (self.tariff.cost, self.tariff.intervalStr),
+            u'Оплата: %i грн.' % (self.price,)
+        ]
 
     def execute(self, db):
         ticket_args = (self.tariff.id, self.tariff.cost, self.result.price,
@@ -50,11 +55,7 @@ where bar="%s"'''
         if not ret:
             return ret
 
-        now = datetime.now().strftime(DATETIME_FORMAT)
-        payment_args = ("Talon payment", 0, 0, "Кассир", now, self.ticket.bar, Ticket.PAID,
-                        self.tariff.type, self.result.cost, self.result.units,
-                        self.ticket.time_in.strftime(DATETIME_FORMAT), now, self.result.price)
-        return db.query(self.PAYMENT_QUERY % payment_args) is None
+        return db.generate_payment(ticket_payment=self)
 
 
 class TicketExcessPayment(QObject):
@@ -85,17 +86,21 @@ class TicketExcessPayment(QObject):
     @pyqtProperty(str, constant=True)
     def explanation(self):
         if not self._enabled:
-            return u'Невозможно оплатить по этому тарифу'
+            return u'!Талон %s.\n невозможно оплатить по этому тарифу.' % (self.ticket.bar,)
         return u'''
 Доплата по талону %s
 Время вьезда: %s
 Последняя оплата: %s
-%s''' % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_FORMAT),
-         self.base_time.strftime(DATETIME_FORMAT), self.result)
+%s''' % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT),
+         self.base_time.strftime(DATETIME_USER_FORMAT), self.result)
 
     TICKET_QUERY = 'update ticket set summdopl = summdopl + %i*100, timedopl="%s", status = status | %i where bar="%s"'
 
-    PAYMENT_QUERY = 'insert into payment values(NULL,"%s",%i,%i,"%s","%s","%s",%i,%i,%i*100,%i,"%s","%s",%i*100)'
+    def vfcd_explanation(self):
+        return [
+            u'%s грн/%s' % (self.tariff.costInfo, self.tariff.intervalStr),
+            u'Доплата: %i грн.' % (self.price,)
+        ]
 
     def execute(self, db):
         args = (self.result.price, self.now.strftime(DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
@@ -103,11 +108,22 @@ class TicketExcessPayment(QObject):
         if not ret:
             return ret
 
-        now = datetime.now().strftime(DATETIME_FORMAT)
-        payment_args = ("Talon payment", 0, 0, "Кассир", now, self.ticket.bar, Ticket.PAID,
-                        self.tariff.type, self.result.cost, self.result.units,
-                        self.ticket.time_in.strftime(DATETIME_FORMAT), now, self.result.price)
-        return db.query(self.PAYMENT_QUERY % payment_args) is None
+        return db.generate_payment(ticket_payment=self)
+
+
+class TicketPaymentUnsupported(QObject):
+    def __init__(self, ticket):
+        QObject.__init__(self)
+        ticket.payments.append(self)
+        self.ticket = ticket
+
+    @pyqtProperty(bool, constant=True)
+    def enabled(self):
+        return False
+
+    @pyqtProperty(str, constant=True)
+    def explanation(self):
+        return u'Талон %s\nНевозможно оплатить по этому тарифу' % (self.ticket.bar,)
 
 
 class TicketPaymentAlreadyPaid(QObject):
@@ -143,7 +159,7 @@ class TicketPaymentAlreadyOut(QObject):
 class TicketPaymentUndefined(QObject):
     def __init__(self, ticket):
         QObject.__init__(self)
-        ticket.payments.append(self)
+        self.ticket.payments.append(self)
         self.ticket = ticket
 
     @pyqtProperty(bool, constant=True)
@@ -215,6 +231,9 @@ class Ticket(QObject):
 
     @pyqtSlot(QObject, result=QObject)
     def pay(self, tariff):
+        if tariff.type not in [Tariff.FIXED, Tariff.DYNAMIC]:
+            return TicketPaymentUnsupported(self)
+
         if self.status == self.IN:
             return TicketPayment(self, tariff)
 

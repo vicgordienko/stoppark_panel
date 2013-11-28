@@ -1,9 +1,10 @@
 ﻿# coding=utf-8
 from PyQt4.QtCore import pyqtSignal, QObject
 from gevent import socket
-from datetime import datetime, date
+from datetime import datetime
 from time import clock as measurement
 from ticket import Ticket
+from card import Card
 from tariff import Tariff
 from config import db_filename, DATETIME_FORMAT
 import sqlite3
@@ -47,9 +48,10 @@ class LocalDB(object):
             filename = db_filename
         self.filename = filename
         self.conn = sqlite3.connect(self.filename)
-        self.conn.executescript(LocalDB.script)
         self.conn.row_factory = sqlite3.Row
         self.conn.text_factory = str
+        self.conn.executescript(LocalDB.script)
+        self.conn.commit()
 
     def query(self, q, *args):
         cursor = self.conn.execute(q, *args)
@@ -199,78 +201,42 @@ values("Event",NULL,"проезд","%s",%i,"%s","",(select placefree from gstatu
             self._strings = ret[0]
         return self._strings
 
+    PAYMENT_QUERY = 'insert into payment values(NULL,"%s",%i,%i,"%s","%s","%s",%i,%i,%i*100,%i,"%s","%s",%i*100)'
 
-class Card(object):
-    STAFF = 0
-    ONCE = 1
-    CLIENT = 2
-    CASHIER = 3
-    ADMIN = 4
+    def generate_payment(self, ticket_payment=None, card_payment=None, once_payment=None):
+        if ticket_payment is None and card_payment is None and once_payment is None:
+            print 'No payment to generate.'
+            return None
 
-    ALLOWED_TYPE = [ONCE, CLIENT]
+        if ticket_payment:
+            payment_args = ("Talon payment", ticket_payment.tariff.id, 0,
+                            'Кассир', datetime.now().strftime(DATETIME_FORMAT),
+                            ticket_payment.ticket.bar, Ticket.PAID, ticket_payment.tariff.id,
+                            ticket_payment.result.cost, ticket_payment.result.units,
+                            ticket_payment.ticket.time_in.strftime(DATETIME_FORMAT),
+                            ticket_payment.now.strftime(DATETIME_FORMAT),
+                            ticket_payment.result.price)
+            return self.query(self.PAYMENT_QUERY % payment_args) is None
 
-    ALLOWED = 1
-    LOST = 2
-    EXPIRED = 3
-    DENIED = 4
-    OUTSIDE = 5
-    INSIDE = 6
+        if once_payment:
+            now = datetime.now().strftime(DATETIME_FORMAT)
+            payment_args = ('Single payment', once_payment.id, 0,
+                            'Кассир', now,
+                            '', 0, once_payment.id,
+                            once_payment.price, 1,
+                            now, now, once_payment.price)
 
-    ALLOWED_STATUS = [
-        [ALLOWED, OUTSIDE],  # 0, directed inside
-        [ALLOWED, INSIDE]    # 1, directed outside
-    ]
+            return self.query(self.PAYMENT_QUERY % payment_args) is None
 
-    @staticmethod
-    def create(response):
-        try:
-            fields = response[0]
-            assert(len(fields) >= 19)
-            return Card(fields)
-        except (ValueError, TypeError, AssertionError):
-            return False
-
-    def __init__(self, fields):
-        self.fields = fields
-
-        self.id = fields[1]
-        self.type = int(fields[2])
-        self.sn = fields[3]
-        self.date_reg = fields[4]
-        self.date_end = fields[5]
-        self.date_in = fields[6]
-        self.date_out = fields[7]
-        self.drive_name = fields[8]
-        self.drive_sname = fields[9]
-        self.drive_fname = fields[10]
-        self.drive_phone = fields[11]
-        self.number = fields[12]
-        self.model = fields[13]
-        self.color = fields[14]
-        self.status = int(fields[15])
-        self.tariff_type = fields[16]
-        self.tariff_price = fields[17]
-        self.tariff_sum = fields[18]
-
-    def check(self, direction):
-        if self.status not in self.ALLOWED_STATUS[direction]:
-            return False
-        if self.type not in self.ALLOWED_TYPE:
-            return False
-
-        begin, end = (
-            datetime.strptime(self.date_reg, '%y-%m-%d').date(),
-            datetime.strptime(self.date_end, '%y-%m-%d').date()
-        )
-        return begin <= date.today() <= end
-
-    def fio(self):
-        return ('%s %s %s' % (self.drive_fname, self.drive_name, self.drive_sname)).decode('utf8')
-
-    def moved(self, db, addr, inside):
-        status = Card.INSIDE if inside else Card.OUTSIDE
-        db.query('update card set status = %i where cardid = \"%s\"' % (status, self.sn))
-        return db.generate_pass_event(addr, inside, self.sn)
+        if card_payment:
+            now = datetime.now().strftime(DATETIME_FORMAT)
+            payment_args = ('Card payment', card_payment.tariff.id, 0,
+                            'Кассир', now,
+                            card_payment.card.sn, Ticket.PAID, card_payment.tariff.id,
+                            card_payment.result.cost, card_payment.result.units,
+                            card_payment.result.begin, card_payment.result.end,
+                            card_payment.result.price)
+            return self.query(self.PAYMENT_QUERY % payment_args) is None
 
 
 if __name__ == '__main__':
@@ -288,4 +254,3 @@ if __name__ == '__main__':
     #tariff = d.get_tariffs()[0]
     #t = d.get_ticket('102514265300000029')
     #print t.pay(tariff).explanation()
-

@@ -26,6 +26,7 @@ else:
     ]
 
 DATETIME_FORMAT = '%y-%m-%d %H:%M:%S'
+DATETIME_USER_FORMAT = '%d/%m/%y %H:%M:%S'
 
 
 def setup_logging(handler=None):
