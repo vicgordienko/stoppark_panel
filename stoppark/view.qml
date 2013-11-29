@@ -32,10 +32,12 @@ Rectangle {
                 payment: payable ? payable.pay(tariff) : null
             })
         }
-        if(index != -1) {
-            list.currentIndex = index
-            list.currentItem.state = 'Details'
+        if(index == -1) {
+            index = 0
         }
+
+        list.currentIndex = index
+        list.currentItem.state = 'Details'
     }
 
     function emit_current_payment() {
@@ -58,10 +60,10 @@ Rectangle {
     ListView {
         id: list
         anchors.top: parent.top
-        width: parent.width - 5
+        width: parent.width - 1
+        height: parent.height - 1
 
-        height: parent.height - 5
-
+        spacing: 5
         clip: true
         focus: true
         orientation: ListView.Vertical
@@ -109,7 +111,7 @@ Rectangle {
                     name: "Details"
 
                     PropertyChanges { target: rect; color: "lightsteelblue" }
-                    PropertyChanges { target: rect; height: widget.height - 5 }
+                    PropertyChanges { target: rect; height: list.height - border.width }
                     PropertyChanges { target: rect; detailsOpacity: 1 }
                     PropertyChanges { target: list; interactive: false }
                     PropertyChanges { target: list; explicit: true; contentY: rect.y }
@@ -289,9 +291,9 @@ Rectangle {
                 text: payment && payment.enabled ? 'К оплате: ' + payment.price + ' грн.': ''
                 font.pointSize: 20
                 anchors.right: parent.right
-                anchors.rightMargin: 25
+                anchors.rightMargin: 20
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: 20
+                anchors.bottomMargin: 10
             }
         }
     }

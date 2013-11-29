@@ -89,11 +89,12 @@ class Reader(QObject):
     def _handle_bar(self, bar):
         print '_handle_bar', bar
         self._ticket = self.db.get_ticket(bar)
-        if not self._ticket:
+        if self._ticket is None:
             print 'registering ticket'
             if Ticket.register(self.db, str(bar)):
                 self._ticket = self.db.get_ticket(bar)
-        self.new_payable.emit(self._ticket, self.db.get_tariffs())
+        if self._ticket:
+            self.new_payable.emit(self._ticket, self.db.get_tariffs())
 
     @staticmethod
     def _card_read_loop(sock):

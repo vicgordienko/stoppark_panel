@@ -25,6 +25,8 @@ else:
         {'path': '\\\\.\\COM4', 'baud': 38400, 'parity': 2, 'impl': 'asio-mt'}
     ]
 
+DATE_FORMAT = '%y-%m-%d'
+DATE_USER_FORMAT = '%d/%m/%y'
 DATETIME_FORMAT = '%y-%m-%d %H:%M:%S'
 DATETIME_USER_FORMAT = '%d/%m/%y %H:%M:%S'
 

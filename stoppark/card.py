@@ -2,11 +2,7 @@
 from PyQt4.QtCore import QObject, pyqtSlot, pyqtProperty
 from datetime import datetime, date
 from tariff import Tariff
-from config import DATETIME_FORMAT
-
-
-CARD_DATE_FORMAT = '%y-%m-%d'
-CARD_DATE_USER_FORMAT = '%d/%m/%y'
+from config import DATETIME_FORMAT, DATE_FORMAT, DATE_USER_FORMAT
 
 
 class CardPayment(QObject):
@@ -34,32 +30,27 @@ class CardPayment(QObject):
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
-        if not self._enabled:
-            return u'Карточка %s\n%s.\n' \
-                   u'Действительна от %s до %s .\n' \
-                   u'Невозможно оплатить по этому тарифу' % (self.card.sn, self.card.fio,
-                                                             self.card.date_reg.strftime(CARD_DATE_USER_FORMAT),
-                                                             self.card.date_end.strftime(CARD_DATE_USER_FORMAT))
-        return u'Карточка %s\n%s.\n' \
-               u'Действительна от %s до %s .\n' \
-               u'После пополнения: от %s до %s' \
-               % (self.card.sn, self.card.fio,
-                  self.card.date_reg.strftime(CARD_DATE_USER_FORMAT),
-                  self.card.date_end.strftime(CARD_DATE_USER_FORMAT),
-                  self.result.begin.strftime(CARD_DATE_USER_FORMAT),
-                  self.result.end.strftime(CARD_DATE_USER_FORMAT))
+        base = u'Карточка %s\n%s.\n' \
+               u'Действительна от %s до %s .\n' % (self.card.sn, self.card.fio,
+                                                   self.card.date_reg.strftime(DATE_USER_FORMAT),
+                                                   self.card.date_end.strftime(DATE_USER_FORMAT))
+        if self._enabled:
+            return base + unicode(self.result)
+        else:
+            return base + u'Невозможно оплатить по этому тарифу'
 
     def vfcd_explanation(self):
         return [
-            u'%s - %s' % (self.result.begin.strftime(CARD_DATE_USER_FORMAT),
-                          self.result.end.strftime(CARD_DATE_USER_FORMAT)),
+            u'%s - %s' % (self.result.begin.strftime(DATE_USER_FORMAT),
+                          self.result.end.strftime(DATE_USER_FORMAT)),
             u'Оплата: %s грн.' % (self.price,)
         ]
 
-    CARD_QUERY = 'update card set dtreg="%s",dtend="%s",tariftype=%i,tarifprice=%i*100,tarifsumm=%i*100 where cardid="%s"'
+    CARD_QUERY = 'update card set DTreg="%s",DTend="%s", TarifType=%i, TarifPrice=%i*100, TarifSumm=%i*100 ' \
+                 'where CardID="%s"'
 
     def execute(self, db):
-        args = (self.result.begin.strftime(CARD_DATE_FORMAT), self.result.end.strftime(CARD_DATE_FORMAT),
+        args = (self.result.begin.strftime(DATE_FORMAT), self.result.end.strftime(DATE_FORMAT),
                 self.tariff.id, self.result.cost, self.result.price, self.card.sn)
         ret = db.query(self.CARD_QUERY % args) is None
         if not ret:
@@ -106,17 +97,19 @@ class Card(QObject):
 
     @staticmethod
     def create(response):
+        if response is False:
+            return False
         try:
             fields = response[0]
             assert(len(fields) >= 19)
             return Card(fields)
         except (ValueError, TypeError, AssertionError):
-            return False
+            return None
 
     @staticmethod
     def parse_date(value):
         try:
-            return datetime.strptime(value, CARD_DATE_FORMAT).date()
+            return datetime.strptime(value, DATE_FORMAT).date()
         except ValueError:
             return None
 
@@ -158,7 +151,7 @@ class Card(QObject):
 
     @pyqtSlot(QObject, result=QObject)
     def pay(self, tariff):
-        if tariff.type not in [Tariff.SUBSCRIPTION]:
+        if tariff.type not in [Tariff.PREPAID, Tariff.SUBSCRIPTION]:
             return CardPaymentUnsupported(self)
 
         return CardPayment(self, tariff)

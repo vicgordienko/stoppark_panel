@@ -32,11 +32,9 @@ class TicketPayment(QObject):
     def explanation(self):
         if not self._enabled:
             return u'!Талон %s.\nНевозможно оплатить по этому тарифу.' % (self.ticket.bar,)
-        return u'''
-Оплата по талону %s
-Время вьезда: %s
-%s
-''' % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT), self.result)
+        return u'Оплата по талону %s.\n' \
+               u'Время вьезда: %s.\n%s' \
+               % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT), self.result)
 
     TICKET_QUERY = '''update ticket
 set typetarif=%i, pricetarif=%i * 100, summ=%i * 100, summdopl=0, timecount="%s", status = status | %i
@@ -44,7 +42,7 @@ where bar="%s"'''
 
     def vfcd_explanation(self):
         return [
-            u'%i грн/%s' % (self.tariff.cost, self.tariff.intervalStr),
+            u'%i грн/%s.' % (self.tariff.cost, self.tariff.intervalStr),
             u'Оплата: %i грн.' % (self.price,)
         ]
 
@@ -87,12 +85,11 @@ class TicketExcessPayment(QObject):
     def explanation(self):
         if not self._enabled:
             return u'!Талон %s.\n невозможно оплатить по этому тарифу.' % (self.ticket.bar,)
-        return u'''
-Доплата по талону %s
-Время вьезда: %s
-Последняя оплата: %s
-%s''' % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT),
-         self.base_time.strftime(DATETIME_USER_FORMAT), self.result)
+        return u'Доплата по талону %s.\n' \
+               u'Время вьезда: %s.\n' \
+               u'Последняя оплата: %s.\n%s' \
+               % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT),
+                  self.base_time.strftime(DATETIME_USER_FORMAT), self.result)
 
     TICKET_QUERY = 'update ticket set summdopl = summdopl + %i*100, timedopl="%s", status = status | %i where bar="%s"'
 
@@ -123,7 +120,7 @@ class TicketPaymentUnsupported(QObject):
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
-        return u'Талон %s\nНевозможно оплатить по этому тарифу' % (self.ticket.bar,)
+        return u'Талон %s\nНевозможно оплатить по этому тарифу.' % (self.ticket.bar,)
 
 
 class TicketPaymentAlreadyPaid(QObject):
@@ -184,12 +181,14 @@ class Ticket(QObject):
 
     @staticmethod
     def create(response):
+        if response is False:
+            return False
         try:
             fields = response[0]
             assert (len(fields) >= 12)
             return Ticket(fields)
         except (TypeError, AssertionError):
-            return False
+            return None
 
     @staticmethod
     def parse_bar(bar):
