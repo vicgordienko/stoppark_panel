@@ -353,7 +353,7 @@ class PrepaidTariff(Tariff):
 
     # Lets use some far away date in the past to test the second algorithm branch
     >>> A = tariff.calc(date(1980,10,1), date(1980,10,15))
-    >>> A.begin == today , A.end == month_end, A.cost == cost * (month_end - today).days
+    >>> A.begin == today , A.end == month_end, A.price == cost * (month_end - today).days
     (True, True, True)
 
     Card that has been refilled up to the end of month, should currently be unavailable for refill by PrepaidContract
@@ -382,3 +382,4 @@ class PrepaidTariff(Tariff):
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
+
