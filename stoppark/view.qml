@@ -46,11 +46,7 @@ Rectangle {
             if(item.payment) {
                 new_payment(item.payment)
             } else {
-                if(item.tariff && item.tariff.enabled) {
-                    new_payment(item.tariff)
-                } else {
-                    new_payment(null);
-                }
+                new_payment(null)
             }
         } else {
             new_payment(null)
@@ -73,7 +69,7 @@ Rectangle {
         }
 
         onCurrentIndexChanged: {
-            console.log('onCurrentIndexChanged', currentIndex)
+            //console.log('onCurrentIndexChanged', currentIndex)
             emit_current_payment()
         }
 
@@ -124,103 +120,6 @@ Rectangle {
                     NumberAnimation { duration: 300; properties: "detailsOpacity,x,contentY,height,width" }
                 }
             }
-
-            /*ListView {
-                id: innerList
-                opacity: tariff.type == 5 ? detailsOpacity : 0
-
-                orientation: ListView.Horizontal
-
-
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.verticalCenter: parent.verticalCenter
-
-                height: 200
-                width: parent.width - 100
-
-                model: ListModel {
-                    id: model
-
-                    ListElement {
-                        value: '1'
-                    }
-
-                    ListElement {
-                        value: '2'
-                    }
-                    ListElement {
-                        value: '3'
-                    }
-                    ListElement {
-                        value: '4'
-                    }
-                    ListElement {
-                        value: '5'
-                    }
-                    ListElement {
-                        value: '6'
-                    }
-                }
-
-                delegate: Rectangle {
-                    height: parent.height - 1
-                    width: 100
-
-                    Text {
-                        id: dataInfo
-                        text: value
-                        font.pointSize: 18
-
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-            }
-
-            Text {
-                id: decreaseParameter
-                opacity: tariff.type == 5 ? detailsOpacity : 0
-                text: '-'
-                font.pointSize: 35
-
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.leftMargin: 20
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        console.log('onClicked -')
-                    }
-                    onPressAndHold: {
-                        console.log('onPressAndHold -')
-                    }
-                    onReleased: {
-                        console.log
-                    }
-                }
-            }
-
-            Text {
-                id: increaseParameter
-                opacity: tariff.type == 5 ? detailsOpacity : 0
-                text: '+'
-                font.pointSize: 35
-
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.right: parent.right
-                anchors.rightMargin: 20
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        console.log('onClicked +')
-                    }
-                    onPressAndHold: {
-                        console.log('onPressAndHold +')
-                    }
-                }
-            }*/
 
             Text {
                 id: title

@@ -31,13 +31,13 @@ class CardPayment(QObject):
     @pyqtProperty(str, constant=True)
     def explanation(self):
         base = u'Карточка %s\n%s.\n' \
-               u'Действительна от %s до %s .\n' % (self.card.sn, self.card.fio,
-                                                   self.card.date_reg.strftime(DATE_USER_FORMAT),
-                                                   self.card.date_end.strftime(DATE_USER_FORMAT))
+               u'Действительна от %s до %s\n' % (self.card.sn, self.card.fio,
+                                                 self.card.date_reg.strftime(DATE_USER_FORMAT),
+                                                 self.card.date_end.strftime(DATE_USER_FORMAT))
         if self._enabled:
             return base + unicode(self.result)
         else:
-            return base + u'Невозможно оплатить по этому тарифу'
+            return base + u'Невозможно оплатить по этому тарифу.'
 
     def vfcd_explanation(self):
         return [
@@ -71,7 +71,7 @@ class CardPaymentUnsupported(QObject):
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
-        return u'Карточка %s\n%s.\nНевозможно оплатить по этому тарифу' % (self.card.sn, self.card.fio)
+        return u'Карточка %s\n%s.\nНевозможно оплатить по этому тарифу.' % (self.card.sn, self.card.fio)
 
 
 class Card(QObject):
@@ -139,6 +139,8 @@ class Card(QObject):
         self.tariff_sum = fields[18]
 
     def check(self, direction):
+        if self.type not in [Card.STAFF, Card.CLIENT]:
+            return False
         if self.status not in self.ALLOWED_STATUS[direction]:
             return False
         if self.type not in self.ALLOWED_TYPE:

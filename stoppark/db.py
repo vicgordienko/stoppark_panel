@@ -41,6 +41,40 @@ class LocalDB(object):
         maxperday text,
         note text
     );
+    create table if not exists payment (
+        id integer primary key,
+        payment text,
+        type integer,
+        kassa integer,
+        operator text,
+        DTime text,
+        TalonID text,
+        Status integer,
+        TarifType integer,
+        Tarif integer,
+        TarifKol integer,
+        DTIn text,
+        DTOut text,
+        Summa integer
+    );
+    create table if not exists events (
+        event text not null default "Event",
+        id integer primary key,
+        EventName text,
+        DateTime text,
+        Terminal integer,
+        Direction text,
+        Reason text,
+        FreePlaces integer,
+        Card text,
+        GosNom text
+    );
+    create table if not exists session (
+        id integer primary key default (null),
+        operator text,
+        begin text default (datetime(current_timestamp, 'localtime')),
+        end text default (null)
+    );
     """
 
     def __init__(self, filename=None):
@@ -50,27 +84,40 @@ class LocalDB(object):
         self.conn = sqlite3.connect(self.filename)
         self.conn.row_factory = sqlite3.Row
         self.conn.text_factory = str
-        self.conn.executescript(LocalDB.script)
-        self.conn.commit()
+        with self.conn as c:
+            c.executescript(LocalDB.script)
+
+    def session_begin(self, operator):
+        with self.conn as c:
+            c.execute('insert into session(operator) values(?)', operator)
+
+    def session(self, session_id=None):
+        session_id = session_id if session_id is not None else '(select max(id) from session)'
+        begin, end = self.query('select begin,end from session where id=%s' % (session_id,))
+        return begin, end
+
+    def session_end(self):
+        with self.conn as c:
+            c.execute('delete from payment')
+            c.execute('delete from events')
+            c.execute('update session set end=datetime(current_timestamp, "localtime") '
+                      'where id=(select max(id) from session)')
+
+    def connection(self):
+        return self.conn
 
     def query(self, q, *args):
         cursor = self.conn.execute(q, *args)
         return [row for row in cursor]
 
     def update_terminals(self, terminals):
-        self.conn.executescript('''
-        create table terminal_remote (
-            id integer primary key,
-            title text
-        );''')
-        self.conn.executemany('insert into terminal_remote values(?,?)', terminals)
-        self.conn.executescript('''
-        delete from terminal where id not in (select id from terminal_remote);
-        insert into terminal(id,title) select id,title from terminal_remote where id not in (select id from terminal);
-        update terminal set title = (select title from terminal_remote where id = terminal.id);
-        drop table terminal_remote;
-        ''')
-        self.conn.commit()
+        with self.conn as c:
+            c.executescript('create table terminal_remote (id integer primary key, title text);')
+            c.executemany('insert into terminal_remote values(?,?)', terminals)
+            c.executescript('''delete from terminal where id not in (select id from terminal_remote);
+insert into terminal(id,title) select id,title from terminal_remote where id not in (select id from terminal);
+update terminal set title = (select title from terminal_remote where id = terminal.id);
+drop table terminal_remote;''')
 
     def get_terminals_id_by_option(self, option):
         return [int(row[0]) for row in self.query('select id from terminal where option = "%s"' % (option,))]
@@ -80,11 +127,11 @@ class LocalDB(object):
 
     def update_tariffs(self, tariffs):
         try:
-            self.conn.executescript('delete from tariffs')
-            self.conn.executemany('insert into tariffs values(?,?,?,?,?,?,?,?)', tariffs)
-            self.conn.commit()
+            with self.conn as c:
+                c.executescript('delete from tariffs')
+                c.executemany('insert into tariffs values(?,?,?,?,?,?,?,?)', tariffs)
         except sqlite3.OperationalError as e:
-            print e.__class__.__name__, e
+            print 'LOCAL DB ERROR', e.__class__.__name__, e
 
     def get_tariff_by_id(self, tariff_id):
         ret = self.query('select * from tariffs where id = ?', (tariff_id,))
@@ -117,7 +164,11 @@ class DB(QObject):
         self.local = LocalDB()
 
     @measure
-    def query(self, q):
+    def query(self, q, local=False):
+        if local:
+            with self.local.connection() as c:
+                c.execute(q)
+
         try:
             s = socket.create_connection(self.addr, timeout=20)
             s.send(q)
@@ -183,7 +234,7 @@ class DB(QObject):
         now = datetime.now().strftime(DATETIME_FORMAT)
 
         args = (event_name, now, addr, reason, self.get_free_places())
-        return self.query('insert into events values("Event",NULL,"%s","%s",%i,"","%s",%i,"","")' % args)
+        return self.query('insert into events values("Event",NULL,"%s","%s",%i,"","%s",%i,"","")' % args, local=True)
 
     PASS_QUERY = '''insert into events
 values("Event",NULL,"проезд","%s",%i,"%s","",(select placefree from gstatus),"%s","")'''
@@ -193,7 +244,7 @@ values("Event",NULL,"проезд","%s",%i,"%s","",(select placefree from gstatu
         now = datetime.now().strftime(DATETIME_FORMAT)
         args = (now, addr, direction_name, sn if sn else '')
 
-        return self.query(self.PASS_QUERY % args)
+        return self.query(self.PASS_QUERY % args, local=True)
 
     def get_config_strings(self):
         ret = self.query('select userstr1,userstr2,userstr3,userstr4,userstr5,userstr6,userstr7,userstr8 from config')
@@ -216,17 +267,17 @@ values("Event",NULL,"проезд","%s",%i,"%s","",(select placefree from gstatu
                             ticket_payment.ticket.time_in.strftime(DATETIME_FORMAT),
                             ticket_payment.now.strftime(DATETIME_FORMAT),
                             ticket_payment.result.price)
-            return self.query(self.PAYMENT_QUERY % payment_args) is None
+            return self.query(self.PAYMENT_QUERY % payment_args, local=True) is None
 
         if once_payment:
             now = datetime.now().strftime(DATETIME_FORMAT)
-            payment_args = ('Single payment', once_payment.id, 0,
+            payment_args = ('Single payment', once_payment.tariff.id, 0,
                             'Кассир', now,
-                            '', 0, once_payment.id,
+                            '', 0, once_payment.tariff.id,
                             once_payment.price, 1,
                             now, now, once_payment.price)
 
-            return self.query(self.PAYMENT_QUERY % payment_args) is None
+            return self.query(self.PAYMENT_QUERY % payment_args, local=True) is None
 
         if card_payment:
             now = datetime.now().strftime(DATETIME_FORMAT)
@@ -236,7 +287,7 @@ values("Event",NULL,"проезд","%s",%i,"%s","",(select placefree from gstatu
                             card_payment.result.cost, card_payment.result.units,
                             card_payment.result.begin, card_payment.result.end,
                             card_payment.result.price)
-            return self.query(self.PAYMENT_QUERY % payment_args) is None
+            return self.query(self.PAYMENT_QUERY % payment_args, local=True) is None
 
 
 if __name__ == '__main__':

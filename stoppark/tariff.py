@@ -1,5 +1,5 @@
 # coding=utf-8
-from PyQt4.QtCore import QObject, pyqtProperty
+from PyQt4.QtCore import QObject, pyqtProperty, pyqtSlot
 from math import ceil, floor
 from datetime import datetime, timedelta, date
 from calendar import monthrange
@@ -207,7 +207,7 @@ class DynamicTariffResult(object):
 
 
 @Tariff.register(Tariff.DYNAMIC)
-class DynamicTariff(FixedTariff):
+class DynamicTariff(Tariff):
     """
     >>> tariff = Tariff.create(['2', '', '2', '1', ' '.join(str(i) for i in range(1,25)), 'None', 'None', 'None'])
     >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,10,0))
@@ -227,7 +227,7 @@ class DynamicTariff(FixedTariff):
     (2, 8, 20, 57, 30)
     """
     def __init__(self, fields):
-        FixedTariff.__init__(self, fields)
+        Tariff.__init__(self, fields)
 
     def calc(self, begin, end):
         return DynamicTariffResult(*self.calc_units(begin, end), cost=self.cost, max_per_day=self.max_per_day)
@@ -237,27 +237,6 @@ class DynamicTariff(FixedTariff):
 class OnceTariff(Tariff):
     def __init__(self, fields):
         Tariff.__init__(self, fields)
-
-    @pyqtProperty(bool, constant=True)
-    def enabled(self):
-        return True
-
-    @pyqtProperty(int, constant=True)
-    def price(self):
-        return self.cost
-
-    @pyqtProperty(str, constant=True)
-    def explanation(self):
-        return u'OnceTariff.explanation'
-
-    def vfcd_explanation(self):
-        return [
-            u'Разовая оплата',
-            u'К оплате: %i грн.' % (self.price,)
-        ]
-
-    def execute(self, db):
-        return db.generate_payment(once_payment=self)
 
 
 class SubscriptionTariffResult(object):
@@ -269,7 +248,7 @@ class SubscriptionTariffResult(object):
         self.price = self.units * self.cost
 
     def __repr__(self):
-        return str( (self.begin, self.end, self.units, self.cost, self.price) )
+        return str((self.begin, self.end, self.units, self.cost, self.price))
 
     def __unicode__(self):
         return u'После пополнения: от %s до %s' % (self.begin.strftime(DATE_USER_FORMAT),

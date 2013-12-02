@@ -8,7 +8,9 @@ from PyQt4.QtDeclarative import QDeclarativeView
 from keyboard import TicketInput
 from gevent import socket, spawn, sleep, get_hub
 from gevent.queue import Queue
-from db import DB, Ticket
+from db import DB, Ticket, Card
+from once_payable import OncePayable
+from report import Report
 from datetime import datetime
 
 
@@ -52,10 +54,11 @@ class SafeSocket(object):
 
 
 class Reader(QObject):
-    new_payable = pyqtSignal(Ticket, list)
+    new_payable = pyqtSignal(QObject, list)
     payment_processed = pyqtSignal()
     tariffs_updated = pyqtSignal(list)
     notify = pyqtSignal(str, str)
+    report = pyqtSignal(object)
 
     def __init__(self, parent=None):
         QObject.__init__(self, parent)
@@ -124,7 +127,14 @@ class Reader(QObject):
         print '_handle_card', sn
         self._card = self.db.get_card(sn)
         if self._card:
-            self.new_payable.emit(self._card, self.db.get_tariffs())
+            if self._card.type in [Card.CLIENT]:
+                self.new_payable.emit(self._card, self.db.get_tariffs())
+            if self._card.type in [Card.STAFF, Card.CASHIER, Card.ADMIN]:
+                self._generate_report()
+
+    def _generate_report(self):
+        print '_generate_report'
+        self.report.emit(Report(self.db.local))
 
     def _display_time_loop(self, sock):
         while True:
@@ -226,6 +236,7 @@ class Reader(QObject):
 
     @async
     def display(self, message):
+        print 'message', message
         self.display_queue.put(message)
 
     @async
@@ -264,6 +275,13 @@ class Payments(QWidget):
         self.ui.tariffs.setResizeMode(QDeclarativeView.SizeRootObjectToView)
         self.ui.tariffs.rootObject().new_payment.connect(self.handle_payment)
 
+        self.reader.report.connect(self.handle_report)
+
+    def handle_report(self, report):
+        self.reader.report.disconnect()
+        print 'report', report.sum, report.moved_in, report.moved_out
+        self.reader.report.connect(self.handle_report)
+
     def manual_ticket_input(self):
         self.reader.new_payable.disconnect()
         ticket_input = TicketInput()
@@ -284,7 +302,7 @@ class Payments(QWidget):
         self.ui.pay.setEnabled(False)
         self.ui.keyboard.setEnabled(True)
 
-        self.payable = None
+        self.payable = OncePayable()
         self.ui.tariffs.rootObject().set_payable(self.payable)
         self.reader.new_payable.connect(self.handle_payable)
 
