@@ -20,7 +20,10 @@ class Main(QWidget):
 
         self.ui.terminals.ready.connect(self.ui.config.terminals_ready)
         self.ui.config.terminals_changed.connect(self.ui.terminals.update_model)
-        self.ui.config.terminals_changed.connect(self.update_terminals)
+        self.ui.config.terminals_changed.connect(self.enable_buttons)
+
+        self.ui.payments.session_started.connect(self.session_start)
+        self.ui.payments.session_ended.connect(self.session_end)
 
         self.db = LocalDB()
         self.left_terminals = []
@@ -31,10 +34,33 @@ class Main(QWidget):
         self.ui.rightUp.clicked.connect(self.right_up)
         self.ui.rightDown.clicked.connect(self.right_down)
 
-        self.update_terminals()
-
         self.ui.payments.new_payment.connect(lambda: self.ui.tabs.setCurrentIndex(1))
+
+        self.session_end()
         #self.setWindowFlags(Qt.CustomizeWindowHint)
+
+    def enable_buttons(self):
+        self.left_terminals = self.db.get_terminals_id_by_option('left')
+        self.ui.leftUp.setEnabled(not not self.left_terminals)
+        self.ui.leftDown.setEnabled(not not self.left_terminals)
+
+        self.right_terminals = \
+            self.db.get_terminals_id_by_option('right')
+        self.ui.rightUp.setEnabled(not not self.right_terminals)
+        self.ui.rightDown.setEnabled(not not self.right_terminals)
+
+    def disable_buttons(self):
+        [bt.setEnabled(False) for bt in [self.ui.leftUp, self.ui.leftDown, self.ui.rightUp, self.ui.rightDown]]
+
+    def session_start(self):
+        [self.ui.tabs.setTabEnabled(i, True) for i in [0, 2]]
+        self.ui.terminals.start_mainloop()
+        self.enable_buttons()
+
+    def session_end(self):
+        [self.ui.tabs.setTabEnabled(i, False) for i in [0, 2]]
+        self.disable_buttons()
+        self.ui.terminals.stop_mainloop()
 
     def localize(self):
         self.ui.tabs.setTabText(0, _('Terminals'))
@@ -56,16 +82,6 @@ class Main(QWidget):
     def right_down(self):
         for addr in self.right_terminals:
             self.ui.terminals.terminal_close(addr)
-
-    def update_terminals(self):
-        self.left_terminals = self.db.get_terminals_id_by_option('left')
-        self.ui.leftUp.setEnabled(not not self.left_terminals)
-        self.ui.leftDown.setEnabled(not not self.left_terminals)
-
-        self.right_terminals = \
-            self.db.get_terminals_id_by_option('right')
-        self.ui.rightUp.setEnabled(not not self.right_terminals)
-        self.ui.rightDown.setEnabled(not not self.right_terminals)
 
     #noinspection PyPep8Naming
     def closeEvent(self, event):

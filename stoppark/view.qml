@@ -20,24 +20,29 @@ Rectangle {
 
     function set_tariffs(tariffs) {
         var index = list.currentIndex
-
         if(index != -1) {
             list.currentItem.state = ''
         }
-        model.clear()
-        for(var i=0; i<tariffs.length;i++) {
-            var tariff = tariffs[i]
-            model.append({
-                tariff: tariff,
-                payment: payable ? payable.pay(tariff) : null
-            })
-        }
-        if(index == -1) {
-            index = 0
-        }
 
-        list.currentIndex = index
-        list.currentItem.state = 'Details'
+        model.clear()
+        if(tariffs) {
+            for(var i=0; i<tariffs.length;i++) {
+                var tariff = tariffs[i]
+                model.append({
+                    tariff: tariff,
+                    payment: payable ? payable.pay(tariff) : null
+                })
+            }
+
+            if(index == -1) {
+                index = 0
+            }
+
+            if(index < model.count) {
+                list.currentIndex = index
+                list.currentItem.state = 'Details'
+            }
+        }
     }
 
     function emit_current_payment() {
@@ -51,6 +56,16 @@ Rectangle {
         } else {
             new_payment(null)
         }
+    }
+
+    Text {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+
+        opacity: list.model.count ? 0 : 1
+
+        text: "Поднесите карточку оператора"
+        font.pointSize: 25
     }
 
     ListView {
@@ -91,7 +106,6 @@ Rectangle {
             MouseArea {
                 anchors.fill: parent
                 onClicked: {
-                    console.log('clicked')
                     if(rect.state == 'Details') {
                         list.currentIndex = -1
                         rect.state = ''

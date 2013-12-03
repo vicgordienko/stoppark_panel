@@ -159,8 +159,6 @@ class Terminals(QWidget):
         self.mainloop = None
         self.delegate = None
 
-        self.update_model()
-
     def test_display(self):
         if self.mainloop:
             self.mainloop.test_display()
@@ -177,7 +175,14 @@ class Terminals(QWidget):
         if self.mainloop:
             self.mainloop.terminal_close(addr)
 
-    def update_model(self):
+    def start_mainloop(self):
+        if self.mainloop is None:
+            self.mainloop = Mainloop(parent=self)
+            self.mainloop.ready.connect(self.on_mainloop_ready)
+            self.mainloop.notify.connect(lambda title, msg: self.notifier.showMessage(title, msg))
+            self.mainloop.start()
+
+    def stop_mainloop(self):
         if self.mainloop:
             self.mainloop.state.disconnect()
             self.mainloop.ready.disconnect()
@@ -189,10 +194,9 @@ class Terminals(QWidget):
 
             self.mainloop = None
 
-        self.mainloop = Mainloop(parent=self)
-        self.mainloop.ready.connect(self.on_mainloop_ready)
-        self.mainloop.notify.connect(lambda title, msg: self.notifier.showMessage(title, msg))
-        self.mainloop.start()
+    def update_model(self):
+        self.stop_mainloop()
+        self.start_mainloop()
 
     def on_mainloop_ready(self, ok, titles):
         if ok:
@@ -215,7 +219,3 @@ class Terminals(QWidget):
             self.mainloop = None
 
         self.ready.emit(ok)
-
-    def stop_mainloop(self):
-        if self.mainloop:
-            self.mainloop.stop()
