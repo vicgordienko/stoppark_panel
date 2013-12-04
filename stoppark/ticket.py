@@ -42,7 +42,7 @@ where bar="%s"'''
 
     def vfcd_explanation(self):
         return [
-            u'%i грн/%s.' % (self.tariff.cost, self.tariff.intervalStr),
+            u'%i грн./%s.' % (self.tariff.cost, self.tariff.intervalStr),
             u'Оплата: %i грн.' % (self.price,)
         ]
 
@@ -95,7 +95,7 @@ class TicketExcessPayment(QObject):
 
     def vfcd_explanation(self):
         return [
-            u'%s грн/%s' % (self.tariff.costInfo, self.tariff.intervalStr),
+            u'%s грн./%s' % (self.tariff.costInfo, self.tariff.intervalStr),
             u'Доплата: %i грн.' % (self.price,)
         ]
 

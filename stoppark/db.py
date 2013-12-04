@@ -69,8 +69,14 @@ class LocalDB(object):
         Card text,
         GosNom text
     );
+    create table if not exists gstatus (
+        id integer primary key,
+        placefree integer
+    );
+    replace into gstatus(id, placefree) values(0, 100);
     create table if not exists session (
         id integer primary key default (null),
+        sn text,
         operator text,
         begin text default (datetime(current_timestamp, 'localtime')),
         end text default (null)
@@ -87,14 +93,17 @@ class LocalDB(object):
         with self.conn as c:
             c.executescript(LocalDB.script)
 
-    def session_begin(self, operator):
+        self.free_places_update_time = None
+
+    def session_begin(self, card):
         with self.conn as c:
-            c.execute('insert into session(operator) values(?)', operator)
+            c.execute('insert into session(sn, operator) values(?,?)', (card.sn, card.fio))
 
     def session(self, session_id=None):
         session_id = session_id if session_id is not None else '(select max(id) from session)'
-        begin, end = self.query('select begin,end from session where id=%s' % (session_id,))
-        return begin, end
+        session = self.query('select sn,operator,begin,end from session where id=%s' % (session_id,))
+        if session:
+            return session[0]
 
     def session_end(self):
         with self.conn as c:
@@ -109,6 +118,17 @@ class LocalDB(object):
     def query(self, q, *args):
         cursor = self.conn.execute(q, *args)
         return [row for row in cursor]
+
+    def update_free_places(self, free_places):
+        with self.conn as c:
+            c.execute('update gstatus set placefree=?', (free_places,))
+            self.free_places_update_time = measurement()
+
+    def get_free_places(self):
+        if self.free_places_update_time is None:
+            return 0, False
+
+        return self.query('select placefree from gstatus')[0][0], measurement() - self.free_places_update_time < 5
 
     def update_terminals(self, terminals):
         with self.conn as c:
@@ -149,7 +169,6 @@ class DB(QObject):
         QObject.__init__(self, parent)
 
         self.addr = (host, port)
-        self._free_places = (100, None)
         self._strings = [
             'ТОВ "КАРД-СIСТЕМС"',
             'м. Київ',
@@ -206,22 +225,21 @@ class DB(QObject):
         return [Tariff.create(t) for t in self.local.get_tariffs()]
 
     def update_free_places(self, diff):
-        if self._free_places is not None:
-            free, timestamp = self._free_places
-            self._free_places = (free + diff, timestamp)
-            self.free_places_update.emit(self._free_places[0])
-        return self.query('update gstatus set placefree = placefree + %i' % (diff,))
+        self.query('update gstatus set placefree = placefree + %i' % (diff,), local=True)
+        free_places, _ = self.local.get_free_places()
+        self.free_places_update.emit(free_places)
 
     def get_free_places(self):
-        now = measurement()
-        if self._free_places[1] is None or self._free_places[1] - now > 5:
+        free_places, valid = self.local.get_free_places()
+        if not valid:
             answer = self.query('select placefree from gstatus')
             try:
-                self._free_places = (int(answer[0][0]), now)
-                self.free_places_update.emit(self._free_places[0])
+                free_places = int(answer[0][0])
+                self.local.update_free_places(free_places)
+                self.free_places_update.emit(free_places)
             except (IndexError, KeyError, ValueError, TypeError) as e:
                 print 'Incorrect response:', e.__class__.__name__, e
-        return self._free_places[0]
+        return free_places
 
     reasons = {1: 'вручную', 5: 'автоматически'}
 
@@ -234,10 +252,11 @@ class DB(QObject):
         now = datetime.now().strftime(DATETIME_FORMAT)
 
         args = (event_name, now, addr, reason, self.get_free_places())
-        return self.query('insert into events values("Event",NULL,"%s","%s",%i,"","%s",%i,"","")' % args, local=True)
+        return self.query('insert into events values("Event",NULL,"%s","%s",%i,"","%s",'
+                          '(select placefree from gstatus),"","")' % args, local=True)
 
-    PASS_QUERY = '''insert into events
-values("Event",NULL,"проезд","%s",%i,"%s","",(select placefree from gstatus),"%s","")'''
+    PASS_QUERY = ('insert into events values("Event",NULL,"проезд","%s",%i,"%s","",'
+                  '(select placefree from gstatus),"%s","")')
 
     def generate_pass_event(self, addr, inside, sn=None):
         direction_name = 'внутрь' if inside else 'наружу'
