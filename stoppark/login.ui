@@ -66,6 +66,13 @@
        </spacer>
       </item>
       <item>
+       <widget class="QPushButton" name="print_check">
+        <property name="text">
+         <string>Печать</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QProgressBar" name="progress">
         <property name="minimum">
          <number>0</number>

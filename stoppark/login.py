@@ -10,6 +10,7 @@ class LoginDialog(QDialog):
         self.ui = uic.loadUiType('login.ui')[0]()
         self.ui.setupUi(self)
         self.ui.progress.setVisible(False)
+        self.ui.print_check.setVisible(False)
         self.setWindowTitle(u'Начало смены')
         self.ui.question.setText(u'Начать смену?')
 
@@ -29,9 +30,11 @@ class LogoffDialog(QDialog):
 
         self.reader = reader
         self.card = card
+        self.report = None
 
         self.ui = uic.loadUiType('login.ui')[0]()
         self.ui.setupUi(self)
+        self.ui.print_check.setVisible(False)
         self.setWindowTitle(u'Завершение смены')
         self.ui.question.setText(u'Завершить смену?')
 
@@ -53,4 +56,6 @@ class LogoffDialog(QDialog):
         self.ui.progress.setVisible(False)
         self.reader.report.disconnect(self.handle_report)
 
-        self.ui.info.setText(self.generate_info(self.card, report))
+        self.report = report
+        self.ui.info.setText(self.generate_info(self.card, self.report))
+        self.ui.print_check.setVisible(True)

@@ -22,8 +22,8 @@ class Main(QWidget):
         self.ui.config.terminals_changed.connect(self.ui.terminals.update_model)
         self.ui.config.terminals_changed.connect(self.enable_buttons)
 
-        self.ui.payments.session_started.connect(self.session_start)
-        self.ui.payments.session_ended.connect(self.session_end)
+        self.ui.payments.session_begin.connect(self.begin_session)
+        self.ui.payments.session_end.connect(self.end_session)
 
         self.db = LocalDB()
         self.left_terminals = []
@@ -36,7 +36,7 @@ class Main(QWidget):
 
         self.ui.payments.new_payment.connect(lambda: self.ui.tabs.setCurrentIndex(1))
 
-        self.session_end()
+        self.end_session()
         #self.setWindowFlags(Qt.CustomizeWindowHint)
 
     def enable_buttons(self):
@@ -52,15 +52,15 @@ class Main(QWidget):
     def disable_buttons(self):
         [bt.setEnabled(False) for bt in [self.ui.leftUp, self.ui.leftDown, self.ui.rightUp, self.ui.rightDown]]
 
-    def session_start(self):
+    def begin_session(self, fio):
         [self.ui.tabs.setTabEnabled(i, True) for i in [0, 2]]
-        self.ui.terminals.start_mainloop()
+        self.ui.terminals.begin_session(fio)
         self.enable_buttons()
 
-    def session_end(self):
+    def end_session(self):
         [self.ui.tabs.setTabEnabled(i, False) for i in [0, 2]]
         self.disable_buttons()
-        self.ui.terminals.stop_mainloop()
+        self.ui.terminals.end_session()
 
     def localize(self):
         self.ui.tabs.setTabText(0, _('Terminals'))

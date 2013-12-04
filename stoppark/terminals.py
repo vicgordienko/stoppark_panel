@@ -175,6 +175,14 @@ class Terminals(QWidget):
         if self.mainloop:
             self.mainloop.terminal_close(addr)
 
+    def begin_session(self, fio):
+        self.ui.cashier.setText(fio)
+        self.start_mainloop()
+
+    def end_session(self):
+        self.ui.cashier.setText(u'')
+        self.stop_mainloop()
+
     def start_mainloop(self):
         if self.mainloop is None:
             self.mainloop = Mainloop(parent=self)
