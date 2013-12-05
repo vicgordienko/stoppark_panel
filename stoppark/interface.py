@@ -239,7 +239,7 @@ class TerminalStrings(Structure):
     #noinspection PyMissingConstructor
     def __init__(self, db):
         strings = db.get_config_strings()
-        [setattr(self.check_lines[i], 'data', s.decode('utf8').encode('cp1251', errors='replace')[:30])
+        [setattr(self.check_lines[i], 'data', s.encode('cp1251', errors='replace')[:30])
          for i, s in enumerate(strings)]
 
     def set(self, terminal, addr):

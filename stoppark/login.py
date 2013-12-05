@@ -44,12 +44,16 @@ class LogoffDialog(QDialog):
         self.ui.no.clicked.connect(self.reject)
 
         self.reader.report.connect(self.handle_report)
+        self.ui.print_check.clicked.connect(self.print_check)
         self.reader.generate_report()
 
     @staticmethod
     def generate_info(card, report=None):
         report = unicode(report) if report else u'Отчет генерируется...'
         return u'Карточка %s\n%s\n\n%s' % (card.sn, card.fio, report)
+
+    def print_check(self):
+        self.reader.to_printer(self.report.check())
 
     def handle_report(self, report):
         print 'handle_report', report

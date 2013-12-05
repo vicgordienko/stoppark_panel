@@ -224,6 +224,10 @@ class DB(QObject):
             self.local.update_tariffs(ret)
         return [Tariff.create(t) for t in self.local.get_tariffs()]
 
+    def get_total_places(self):
+        ret = self.query('select PlaceNum from config')
+        return int(ret[0][0]) if ret else ret
+
     def update_free_places(self, diff):
         self.query('update gstatus set placefree = placefree + %i' % (diff,), local=True)
         free_places, _ = self.local.get_free_places()
@@ -251,17 +255,17 @@ class DB(QObject):
         event_name = 'открытие' if command % 2 else ''
         now = datetime.now().strftime(DATETIME_FORMAT)
 
-        args = (event_name, now, addr, reason, self.get_free_places())
+        args = (event_name, now, addr, reason)
         return self.query('insert into events values("Event",NULL,"%s","%s",%i,"","%s",'
                           '(select placefree from gstatus),"","")' % args, local=True)
 
     PASS_QUERY = ('insert into events values("Event",NULL,"проезд","%s",%i,"%s","",'
-                  '(select placefree from gstatus),"%s","")')
+                  '(select placefree from gstatus),%s,"")')
 
     def generate_pass_event(self, addr, inside, sn=None):
         direction_name = 'внутрь' if inside else 'наружу'
         now = datetime.now().strftime(DATETIME_FORMAT)
-        args = (now, addr, direction_name, sn if sn else '')
+        args = (now, addr, direction_name, '"%s"' % (sn,) if sn else 'null')
 
         return self.query(self.PASS_QUERY % args, local=True)
 
@@ -269,7 +273,7 @@ class DB(QObject):
         ret = self.query('select userstr1,userstr2,userstr3,userstr4,userstr5,userstr6,userstr7,userstr8 from config')
         if ret:
             self._strings = ret[0]
-        return self._strings
+        return [s.decode('utf8', errors='replace') for s in self._strings]
 
     PAYMENT_QUERY = 'insert into payment values(NULL,"%s",%i,%i,"%s","%s","%s",%i,%i,%i*100,%i,"%s","%s",%i*100)'
 

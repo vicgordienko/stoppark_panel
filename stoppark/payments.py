@@ -2,7 +2,7 @@
 import re
 from threading import Thread
 from PyQt4 import uic
-from PyQt4.QtCore import QObject, pyqtSignal, QUrl
+from PyQt4.QtCore import QObject, pyqtSignal, pyqtSlot, QUrl
 from PyQt4.QtGui import QWidget, QIcon, QSystemTrayIcon, QDialog
 from PyQt4.QtDeclarative import QDeclarativeView
 from login import LoginDialog, LogoffDialog
@@ -170,10 +170,12 @@ class Reader(QObject):
         spawn(self._card_loop)
         spawn(self.display_loop)
 
-        sn, operator, begin, end = self.db.local.session()
-        print sn, operator, begin, end
-        if end is None:
-            self.session_begin.emit(sn, operator.decode('utf8'))
+        session = self.db.local.session()
+        if session is not None:
+            sn, operator, begin, end = session
+            print sn, operator, begin, end
+            if end is None:
+                self.session_begin.emit(sn, operator.decode('utf8'))
 
         while True:
             action = self.queue.get()
@@ -191,8 +193,21 @@ class Reader(QObject):
         self.thread.start()
 
     @async
+    def to_printer(self, message):
+        printer = SafeSocket('/tmp/printer')
+        message = message.encode('cp1251', errors='replace')
+        message = message.replace('<b>', '\x1d!\x00')
+        message = message.replace('</b>', '\x1d!\x00')
+        #message = message.replace('<c>', '\x1ba\x49')
+        #message = message.replace('</c>', '\x1ba\x48')
+        while message:
+            printer.send(message[:256])
+            sleep(0.5)
+            message = message[256:]
+
+    @async
     def handle_bar(self, bar):
-        self._handle_bar(bar)
+        self.ticket_reader.handle_bar(bar, self.db)
 
     @async
     def update_tariffs(self):
@@ -222,7 +237,7 @@ class Reader(QObject):
     @async
     def generate_report(self):
         print 'generate_report'
-        self.report.emit(Report(self.db.local))
+        self.report.emit(Report(self.db))
 
     @async
     def stop(self):
@@ -298,9 +313,10 @@ class Payments(QWidget):
                 return self.reader.end_session()
         self.reader.new_operator.connect(self.handle_operator)
 
+    @pyqtSlot(QObject)
     def handle_operator(self, card):
         print 'operator', card
-        self.reader.new_operator.disconnect()
+        self.reader.new_operator.disconnect(self.handle_operator)
         self.session_dialog.emit(card)
 
     def manual_ticket_input(self):
@@ -332,6 +348,7 @@ class Payments(QWidget):
         self.ui.cancel.setEnabled(True)
         self.ui.pay.setEnabled(True)
 
+    @pyqtSlot(QObject, list)
     def handle_payable(self, payable, tariffs):
         self.reader.new_payable.disconnect(self.handle_payable)
         self.new_payment.emit()
@@ -370,6 +387,7 @@ class Payments(QWidget):
         self.ui.tariffs.setEnabled(False)
         self.ui.progress.setVisible(True)
 
+    @pyqtSlot()
     def payment_completed(self):
         self.payment = None
         self.ui.progress.setVisible(False)
