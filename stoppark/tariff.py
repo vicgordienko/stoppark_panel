@@ -150,6 +150,40 @@ class FixedTariff(Tariff):
     (0, 0, 45, 1, 1)
     >>> tariff.calc(datetime(2013,10,28,9,0,0), datetime(2013,10,28,14,45,0))
     (0, 5, 45, 6, 6)
+    >>> tariff.calc(datetime(2013,12,01,9,0,0), datetime(2013,12,02,10,00,0))
+    (1, 1, 0, 25, 25)
+    >>> tariff.calc(datetime(2013,12,01,23,55,0), datetime(2013,12,02,03,25,0))
+    (0, 3, 30, 4, 4)
+    >>> tariff.calc(datetime(2014,02,28,23,30,0), datetime(2014,03,01,04,00,0))
+    (0, 4, 30, 5, 5)
+    >>> tariff.calc(datetime(2008,02,28,23,30,0), datetime(2008,02,29,02,00,0))
+    (0, 2, 30, 3, 3)
+    >>> tariff.calc(datetime(2008,02,28,23,30,0), datetime(2008,03,01,02,00,0))
+    (1, 2, 30, 27, 27)
+    >>> tariff.calc(datetime(2013,11,30,23,55,0), datetime(2013,12,01,00,05,0))
+    (0, 0, 10, 0, 0)
+    >>> tariff.calc(datetime(2013,10,30,23,50,0), datetime(2013,10,31,01,00,0))
+    (0, 1, 10, 1, 1)
+
+    #typo date
+    >>> tariff.calc(datetime(2013,10,24,09,00,0), datetime(2013,10,21,10,00,0))
+    (0, 1, 0, 1, 1)
+
+    #typo time
+    >>> tariff.calc(datetime(2013,10,24,09,00,0), datetime(2013,10,24,08,50,0))
+    (0, 1, 0, 1, 1)
+
+    #transfer time     (0, 3, 0, 3, 3)
+     >>> tariff.calc(datetime(2013,10,26,23,00,0), datetime(2013,10,27,01,00,0))
+    (0, 2, 0, 2, 2)
+
+    >>> tariff.calc(datetime(2013,10,31,22,00,0), datetime(2013,11,01,09,00,0))
+    (0, 11, 00, 11, 11)
+    >>> tariff.calc(datetime(2013,11,30,23,00,0), datetime(2013,12,01,08,00,0))
+    (0, 9, 0, 9, 9)
+
+    >>> tariff.calc(datetime(2013,09,31,22,00,0), datetime(2013,10,01,09,00,0))
+
     >>> tariff = Tariff.create(['1', 'Час 1 грн. X', '1', '2', '1', '09:00', 'None', 'None'])
     >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,11,10,0))
     (2, 3, 10, 4, 4)
