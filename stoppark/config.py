@@ -25,6 +25,7 @@ else:
         {'path': '\\\\.\\COM4', 'baud': 38400, 'parity': 2, 'impl': 'asio-mt'}
     ]
 
+LOCAL_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 DATE_FORMAT = '%y-%m-%d'
 DATE_USER_FORMAT = '%d/%m/%y'
 DATETIME_FORMAT = '%y-%m-%d %H:%M:%S'

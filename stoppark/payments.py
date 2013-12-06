@@ -2,7 +2,7 @@
 import re
 from threading import Thread
 from PyQt4 import uic
-from PyQt4.QtCore import QObject, pyqtSignal, QUrl
+from PyQt4.QtCore import QObject, pyqtSignal, pyqtSlot, QUrl
 from PyQt4.QtGui import QWidget, QIcon, QSystemTrayIcon, QDialog
 from PyQt4.QtDeclarative import QDeclarativeView
 from login import LoginDialog, LogoffDialog
@@ -100,7 +100,7 @@ class Reader(QObject):
     payment_processed = pyqtSignal()
     tariffs_updated = pyqtSignal(list)
     notify = pyqtSignal(str, str)
-    session_begin = pyqtSignal(str)
+    session_begin = pyqtSignal(str, str)
     session_end = pyqtSignal()
     report = pyqtSignal(object)
 
@@ -145,7 +145,7 @@ class Reader(QObject):
         if self._card:
             if self._card.type in [Card.CLIENT]:
                 self.new_payable.emit(self._card, self.db.get_tariffs())
-            if self._card.type in [Card.CASHIER]:
+            if self._card.type in [Card.CASHIER, Card.ADMIN]:
                 self.new_operator.emit(self._card)
 
     def _tariff_updater(self):
@@ -170,7 +170,12 @@ class Reader(QObject):
         spawn(self._card_loop)
         spawn(self.display_loop)
 
-        print self.db.local.session()
+        session = self.db.local.session()
+        if session is not None:
+            sn, operator, begin, end = session
+            print sn, operator, begin, end
+            if end is None:
+                self.session_begin.emit(sn, operator.decode('utf8'))
 
         while True:
             action = self.queue.get()
@@ -188,8 +193,21 @@ class Reader(QObject):
         self.thread.start()
 
     @async
+    def to_printer(self, message):
+        printer = SafeSocket('/tmp/printer')
+        message = message.encode('cp1251', errors='replace')
+        message = message.replace('<b>', '\x1d!\x00')
+        message = message.replace('</b>', '\x1d!\x00')
+        #message = message.replace('<c>', '\x1ba\x49')
+        #message = message.replace('</c>', '\x1ba\x48')
+        while message:
+            printer.send(message[:256])
+            sleep(0.5)
+            message = message[256:]
+
+    @async
     def handle_bar(self, bar):
-        self._handle_bar(bar)
+        self.ticket_reader.handle_bar(bar, self.db)
 
     @async
     def update_tariffs(self):
@@ -209,7 +227,7 @@ class Reader(QObject):
     @async
     def begin_session(self, card):
         self.db.local.session_begin(card)
-        self.session_begin.emit(card.sn)
+        self.session_begin.emit(card.sn, card.fio)
 
     @async
     def end_session(self):
@@ -219,7 +237,7 @@ class Reader(QObject):
     @async
     def generate_report(self):
         print 'generate_report'
-        self.report.emit(Report(self.db.local))
+        self.report.emit(Report(self.db))
 
     @async
     def stop(self):
@@ -228,8 +246,9 @@ class Reader(QObject):
 
 class Payments(QWidget):
     new_payment = pyqtSignal()
-    session_started = pyqtSignal(str)
-    session_ended = pyqtSignal()
+    session_begin = pyqtSignal(str)
+    session_end = pyqtSignal()
+    session_dialog = pyqtSignal(QObject)
 
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
@@ -245,12 +264,6 @@ class Payments(QWidget):
         self.ui = uic.loadUiType('payments.ui')[0]()
         self.ui.setupUi(self)
 
-        self.reader = Reader(self)
-        self.reader.notify.connect(lambda title, msg: self.notifier.showMessage(title, msg))
-        self.reader.session_begin.connect(self.session_begin)
-        self.reader.session_end.connect(self.session_end)
-        self.reader.start()
-
         self.ui.keyboard.clicked.connect(self.manual_ticket_input)
         self.ui.cancel.clicked.connect(self.cancel)
         self.ui.pay.clicked.connect(self.pay)
@@ -259,21 +272,28 @@ class Payments(QWidget):
         self.ui.tariffs.setResizeMode(QDeclarativeView.SizeRootObjectToView)
         self.ui.tariffs.rootObject().new_payment.connect(self.handle_payment)
 
-        self.session_end()
+        self.session_dialog.connect(self.handle_session_dialog)
 
-    def session_begin(self, sn):
-        print 'session_start', sn
+        self.reader = Reader(self)
+        self.reader.notify.connect(lambda title, msg: self.notifier.showMessage(title, msg))
+        self.reader.session_begin.connect(self.begin_session)
+        self.reader.session_end.connect(self.end_session)
+        self.end_session()
+        self.reader.start()
+
+    def begin_session(self, sn, fio):
+        print 'begin_session', sn
         self.session = sn
-        self.session_started.emit(sn)
+        self.session_begin.emit(fio)
 
         self.reader.new_operator.connect(self.handle_operator)
         self.reader.tariffs_updated.connect(self.update_tariffs)
         self.reader.update_tariffs()
 
-    def session_end(self):
-        print 'session_end'
+    def end_session(self):
+        print 'end_session'
         self.session = None
-        self.session_ended.emit()
+        self.session_end.emit()
 
         self.reader.new_operator.connect(self.handle_operator)
         self.ui.progress.setVisible(False)
@@ -282,18 +302,22 @@ class Payments(QWidget):
         self.ui.cancel.setEnabled(False)
         self.update_tariffs(None)
 
-    def handle_operator(self, card):
-        print 'operator', card
-        self.reader.new_operator.disconnect(self.handle_operator)
-        if self.session is None:
+    def handle_session_dialog(self, card):
+        if self.session is None and card.type == Card.CASHIER:
             login_dialog = LoginDialog(card, parent=self)
             if login_dialog.exec_() == QDialog.Accepted:
                 return self.reader.begin_session(card)
-        elif self.session == card.sn:
+        elif self.session == card.sn or card.type == Card.ADMIN:
             login_dialog = LogoffDialog(card, self.reader)
             if login_dialog.exec_() == QDialog.Accepted:
                 return self.reader.end_session()
         self.reader.new_operator.connect(self.handle_operator)
+
+    @pyqtSlot(QObject)
+    def handle_operator(self, card):
+        print 'operator', card
+        self.reader.new_operator.disconnect(self.handle_operator)
+        self.session_dialog.emit(card)
 
     def manual_ticket_input(self):
         self.reader.new_payable.disconnect(self.handle_payable)
@@ -324,6 +348,7 @@ class Payments(QWidget):
         self.ui.cancel.setEnabled(True)
         self.ui.pay.setEnabled(True)
 
+    @pyqtSlot(QObject, list)
     def handle_payable(self, payable, tariffs):
         self.reader.new_payable.disconnect(self.handle_payable)
         self.new_payment.emit()
@@ -362,6 +387,7 @@ class Payments(QWidget):
         self.ui.tariffs.setEnabled(False)
         self.ui.progress.setVisible(True)
 
+    @pyqtSlot()
     def payment_completed(self):
         self.payment = None
         self.ui.progress.setVisible(False)
