@@ -53,9 +53,6 @@ class TerminalWidget(QWidget):
             self.options_layout.itemAt(i).widget().setParent(None)
 
     def gesture_event(self, event):
-        #if event.gestureType() == self.tap_and_hold_type:
-        #    self.init_config_layout()
-        #    return True
         if event.gestureType() == Qt.TapAndHoldGesture:
             self.init_config_layout()
             return True
@@ -82,7 +79,6 @@ class TerminalWidget(QWidget):
         return button
 
     def show_message(self, msg):
-        print unicode(msg).encode('utf8')
         self.message.setText(msg)
 
     def set_style_color(self, color):

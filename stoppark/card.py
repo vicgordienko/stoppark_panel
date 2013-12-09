@@ -2,14 +2,14 @@
 from PyQt4.QtCore import QObject, pyqtSlot, pyqtProperty
 from datetime import datetime, date
 from tariff import Tariff
+from payment import Payment
 from config import DATETIME_FORMAT, DATE_FORMAT, DATE_USER_FORMAT
 
 
-class CardPayment(QObject):
+class CardPayment(Payment):
     def __init__(self, card, tariff):
-        QObject.__init__(self)
+        Payment.__init__(self, card.payments)
         self.card = card
-        self.card.payments.append(self)
 
         self._enabled = hasattr(tariff, 'calc')
         if not self._enabled:
@@ -58,16 +58,17 @@ class CardPayment(QObject):
 
         return db.generate_payment(card_payment=self)
 
+    def check(self, db):
+        """
+        This method should do nothing for card payments.
+        """
+        pass
 
-class CardPaymentUnsupported(QObject):
+
+class CardPaymentUnsupported(Payment):
     def __init__(self, card):
-        QObject.__init__(self)
+        Payment.__init__(self, card.payments)
         self.card = card
-        self.card.payments.append(self)
-
-    @pyqtProperty(bool, constant=True)
-    def enabled(self):
-        return False
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
@@ -75,13 +76,23 @@ class CardPaymentUnsupported(QObject):
 
 
 class Card(QObject):
+    """
+    This is a Card class that represents contactless card from remote database.
+    There are many card types, and every one of them is subject to a set of rules.
+
+    Only CLIENT cards can generate payments.
+    CLIENT and STAFF cards can pass through parking gates (if check method considers their state appropriate).
+
+    Only CASHIER cards can open sessions and only same CASHIER (or ADMIN, if there is no cashier nearby) can close it.
+    """
+
     STAFF = 0
     ONCE = 1
     CLIENT = 2
     CASHIER = 3
     ADMIN = 4
 
-    ALLOWED_TYPE = [ONCE, CLIENT]
+    ALLOWED_TYPE = [ONCE, CLIENT, STAFF]
 
     ALLOWED = 1
     LOST = 2
@@ -139,11 +150,9 @@ class Card(QObject):
         self.tariff_sum = fields[18]
 
     def check(self, direction):
-        if self.type not in [Card.STAFF, Card.CLIENT]:
+        if self.type not in self.ALLOWED_TYPE:
             return False
         if self.status not in self.ALLOWED_STATUS[direction]:
-            return False
-        if self.type not in self.ALLOWED_TYPE:
             return False
 
         if self.date_reg is None or self.date_end is None:
@@ -160,7 +169,13 @@ class Card(QObject):
 
     @pyqtProperty(str, constant=True)
     def fio(self):
-        return ('%s %s %s' % (self.drive_fname, self.drive_name, self.drive_sname)).decode('utf8')
+        return ('%s %s %s' % (self.drive_fname, self.drive_name, self.drive_sname)).decode('utf8', errors='replace')
+
+    @pyqtProperty(str, constant=True)
+    def fio_short(self):
+        return u'%s %s.%s.' % (self.drive_fname.decode('utf8', errors='replace'),
+                               self.drive_name.decode('utf8', errors='replace')[0],
+                               self.drive_sname.decode('utf8', errors='replace')[0])
 
     def moved(self, db, addr, inside):
         status = Card.INSIDE if inside else Card.OUTSIDE

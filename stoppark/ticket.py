@@ -3,12 +3,12 @@ from PyQt4.QtCore import QObject, pyqtProperty, pyqtSlot
 from datetime import datetime
 from config import DATETIME_FORMAT, DATETIME_USER_FORMAT
 from tariff import Tariff
+from payment import Payment
 
 
-class TicketPayment(QObject):
+class TicketPayment(Payment):
     def __init__(self, ticket, tariff):
-        QObject.__init__(self)
-        ticket.payments.append(self)
+        Payment.__init__(self, ticket.payments)
 
         self._enabled = hasattr(tariff, 'calc')
         if not self._enabled:
@@ -36,18 +36,17 @@ class TicketPayment(QObject):
                u'Время вьезда: %s.\n%s' \
                % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT), self.result)
 
-    TICKET_QUERY = '''update ticket
-set typetarif=%i, pricetarif=%i * 100, summ=%i * 100, summdopl=0, timecount="%s", status = status | %i
-where bar="%s"'''
-
     def vfcd_explanation(self):
         return [
             u'%i грн./%s.' % (self.tariff.cost, self.tariff.intervalStr),
             u'Оплата: %i грн.' % (self.price,)
         ]
 
+    TICKET_QUERY = ('update ticket set typetarif=%i, pricetarif="%s", summ=%i * 100,'
+                    'summdopl=0, timecount="%s", status = status | %i where bar="%s"')
+
     def execute(self, db):
-        ticket_args = (self.tariff.id, self.tariff.cost, self.result.price,
+        ticket_args = (self.tariff.id, self.tariff.cost_db, self.result.price,
                        self.now.strftime(DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
         ret = db.query(self.TICKET_QUERY % ticket_args) is None
         if not ret:
@@ -55,11 +54,24 @@ where bar="%s"'''
 
         return db.generate_payment(ticket_payment=self)
 
+    def check(self, db):
+        interval = {Tariff.HOURLY: u'год.', Tariff.DAILY: u'доб.', Tariff.MONTHLY: u'міс.'}[self.tariff.interval]
 
-class TicketExcessPayment(QObject):
+        return Payment.check(self, db) + u'\n'.join([
+            u' в\'їзд: %s' % (self.ticket.time_in.strftime(DATETIME_USER_FORMAT),),
+            u'оплата: %s' % (self.now.strftime(DATETIME_USER_FORMAT),),
+            u'тривалість паркування: %s' % (self.result.interval,),
+            u'тариф: %s грн./%s' % (self.tariff.costInfo, interval),
+            u'<hr />',
+            u'Вартість: %s грн.' % (self.price,),
+            u'<hr />',
+            u'<<%s>>' % (self.ticket.bar,),
+        ])
+
+
+class TicketExcessPayment(Payment):
     def __init__(self, ticket, tariff, excess=False):
-        QObject.__init__(self)
-        ticket.payments.append(self)
+        Payment.__init__(self, ticket.payments)
 
         self._enabled = hasattr(tariff, 'calc')
         if not self._enabled:
@@ -107,61 +119,55 @@ class TicketExcessPayment(QObject):
 
         return db.generate_payment(ticket_payment=self)
 
+    def check(self, db):
+        interval = {Tariff.HOURLY: u'год.', Tariff.DAILY: u'доб.', Tariff.MONTHLY: u'міс.'}[self.tariff.interval]
 
-class TicketPaymentUnsupported(QObject):
+        return Payment.check(self, db) + u'\n'.join([
+            u'остання оплата: %s' % (self.base_time.strftime(DATETIME_USER_FORMAT),),
+            u'       доплата: %s' % (self.now.strftime(DATETIME_USER_FORMAT),),
+            u'тривалість паркування: %s' % (self.result.interval,),
+            u'тариф: %s грн./%s' % (self.tariff.costInfo, interval),
+            u'<hr />',
+            u'Вартість: %s грн.' % (self.price,),
+            u'<hr />',
+            u'<<%s>>' % (self.ticket.bar,),
+        ])
+
+
+class TicketPaymentUnsupported(Payment):
     def __init__(self, ticket):
-        QObject.__init__(self)
-        ticket.payments.append(self)
+        Payment.__init__(self, ticket.payments)
         self.ticket = ticket
-
-    @pyqtProperty(bool, constant=True)
-    def enabled(self):
-        return False
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
         return u'Талон %s\nНевозможно оплатить по этому тарифу.' % (self.ticket.bar,)
 
 
-class TicketPaymentAlreadyPaid(QObject):
+class TicketPaymentAlreadyPaid(Payment):
     def __init__(self, ticket):
-        QObject.__init__(self)
-        ticket.payments.append(self)
+        Payment.__init__(self, ticket.payments)
         self.ticket = ticket
-
-    @pyqtProperty(bool, constant=True)
-    def enabled(self):
-        return False
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
         return u'Талон %s уже оплачен.' % (self.ticket.bar,)
 
 
-class TicketPaymentAlreadyOut(QObject):
+class TicketPaymentAlreadyOut(Payment):
     def __init__(self, ticket):
-        QObject.__init__(self)
-        ticket.payments.append(self)
+        Payment.__init__(self, ticket.payments)
         self.ticket = ticket
-
-    @pyqtProperty(bool, constant=True)
-    def enabled(self):
-        return False
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
         return u'Талон %s уже выехал.' % (self.ticket.bar,)
 
 
-class TicketPaymentUndefined(QObject):
+class TicketPaymentUndefined(Payment):
     def __init__(self, ticket):
-        QObject.__init__(self)
-        self.ticket.payments.append(self)
+        Payment.__init__(self, ticket.payments)
         self.ticket = ticket
-
-    @pyqtProperty(bool, constant=True)
-    def enabled(self):
-        return False
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
@@ -275,5 +281,4 @@ class Ticket(QObject):
 
 if __name__ == '__main__':
     import doctest
-
     doctest.testmod()
