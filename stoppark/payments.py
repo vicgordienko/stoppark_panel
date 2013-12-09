@@ -18,7 +18,7 @@ from datetime import datetime
 
 class TicketReader(object):
     def __init__(self, peer, new_payable):
-        self.regex = re.compile(r'(;(\d+)\?\r\n)')
+        self.regex = re.compile(r'(;(?P<bar>\d+)\?\r\n)')
         self.peer = peer
         self.new_payable = new_payable
         self.buf = ''
@@ -43,7 +43,7 @@ class TicketReader(object):
             last_index = 0
             for match in self.regex.finditer(self.buf):
                 last_index = match.span()[1]
-                bar = match.group(2)
+                bar = match.group('bar')
                 if len(bar) < 18:
                     continue
                 self.handle_bar(bar, db)
@@ -81,7 +81,7 @@ class DisplayLoop(object):
 
     @staticmethod
     def display(sock, messages):
-        messages = [message.encode('cp866') for message in messages]
+        messages = [message.encode('cp866', errors='replace') for message in messages]
         # set cursor at given position and send each message
         [sock.send('\x1b\x6c\x01' + chr(i+1) + message + ' '*(20 - len(message))) for i, message in enumerate(messages)]
 
@@ -122,7 +122,7 @@ class Reader(QObject):
             sleep(1)
 
     def _card_loop(self):
-        bar_regex = re.compile(r'(;([A-Z\d]+)\?)')
+        bar_regex = re.compile(r'(;(?P<sn>[A-Z\d]+)\?)')
         sock = SafeSocket('/tmp/card')
         spawn(self._card_read_loop, sock)
         buf = ''
@@ -133,7 +133,7 @@ class Reader(QObject):
             last_index = 0
             for match in bar_regex.finditer(buf):
                 last_index = match.span()[1]
-                bar = match.group(2)
+                bar = match.group('sn')
 
                 self._handle_card(bar)
 
@@ -175,7 +175,7 @@ class Reader(QObject):
             sn, operator, begin, end = session
             print sn, operator, begin, end
             if end is None:
-                self.session_begin.emit(sn, operator.decode('utf8'))
+                self.session_begin.emit(sn, operator.decode('utf8', errors='replace'))
 
         while True:
             action = self.queue.get()
@@ -192,14 +192,29 @@ class Reader(QObject):
     def start(self):
         self.thread.start()
 
+    @staticmethod
+    def barcode_replace(match):
+        bar = match.group('bar')
+        result = ('\n\x1ba\x31\x1dw\x02\x1d\x68\x70\x1dk\x48'
+                  + chr(len(bar)) + bar*2 + '\n\x1ba\x30')
+        return result
+
+    BARCODE_REPLACE_REGEX = re.compile(r'<<(?P<bar>\d+)>>')
+
     @async
     def to_printer(self, message):
         printer = SafeSocket('/tmp/printer')
         message = message.encode('cp1251', errors='replace')
-        message = message.replace('<b>', '\x1d!\x00')
+        message = message.replace('<b>', '\x1d!\x01')
         message = message.replace('</b>', '\x1d!\x00')
-        #message = message.replace('<c>', '\x1ba\x49')
-        #message = message.replace('</c>', '\x1ba\x48')
+        message = message.replace('<s>', '\x1d!\x21')
+        message = message.replace('</s>', '\x1d!\x00')
+        message = message.replace('<c>', '\x1ba\x31')
+        message = message.replace('</c>\n', '\n\x1ba\x30')
+        message = message.replace('</c>', '\x1ba\x30')
+        message = message.replace('<hr />', '-'*48)
+        message = re.sub(self.BARCODE_REPLACE_REGEX, self.barcode_replace, message)
+        message += '\n'*6 + '\x1d\x56\x01'
         while message:
             printer.send(message[:256])
             sleep(0.5)
@@ -217,6 +232,7 @@ class Reader(QObject):
     def pay(self, payment):
         try:
             payment.execute(self.db)
+            self.to_printer(payment.check(self.db))
         finally:
             self.payment_processed.emit()
 
@@ -398,3 +414,8 @@ class Payments(QWidget):
 
     def stop_reader(self):
         self.reader.stop()
+
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()

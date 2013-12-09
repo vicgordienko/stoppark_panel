@@ -40,12 +40,16 @@ class LogoffDialog(QDialog):
 
         self.ui.info.setText(self.generate_info(card))
 
-        self.ui.yes.clicked.connect(self.accept)
+        self.ui.yes.clicked.connect(self.accept_logoff)
         self.ui.no.clicked.connect(self.reject)
 
         self.reader.report.connect(self.handle_report)
         self.ui.print_check.clicked.connect(self.print_check)
         self.reader.generate_report()
+
+    def accept_logoff(self):
+        self.reader.to_printer(self.report.check(cashier=self.card.fio_short))
+        self.accept()
 
     @staticmethod
     def generate_info(card, report=None):

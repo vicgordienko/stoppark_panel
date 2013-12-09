@@ -2,14 +2,14 @@
 from PyQt4.QtCore import QObject, pyqtSlot, pyqtProperty
 from datetime import datetime, date
 from tariff import Tariff
+from payment import Payment
 from config import DATETIME_FORMAT, DATE_FORMAT, DATE_USER_FORMAT
 
 
-class CardPayment(QObject):
+class CardPayment(Payment):
     def __init__(self, card, tariff):
-        QObject.__init__(self)
+        Payment.__init__(self, card.payments)
         self.card = card
-        self.card.payments.append(self)
 
         self._enabled = hasattr(tariff, 'calc')
         if not self._enabled:
@@ -59,15 +59,10 @@ class CardPayment(QObject):
         return db.generate_payment(card_payment=self)
 
 
-class CardPaymentUnsupported(QObject):
+class CardPaymentUnsupported(Payment):
     def __init__(self, card):
-        QObject.__init__(self)
+        Payment.__init__(self, card.payments)
         self.card = card
-        self.card.payments.append(self)
-
-    @pyqtProperty(bool, constant=True)
-    def enabled(self):
-        return False
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
@@ -160,7 +155,13 @@ class Card(QObject):
 
     @pyqtProperty(str, constant=True)
     def fio(self):
-        return ('%s %s %s' % (self.drive_fname, self.drive_name, self.drive_sname)).decode('utf8')
+        return ('%s %s %s' % (self.drive_fname, self.drive_name, self.drive_sname)).decode('utf8', errors='replace')
+
+    @pyqtProperty(str, constant=True)
+    def fio_short(self):
+        return u'%s %s.%s.' % (self.drive_fname.decode('utf8', errors='replace'),
+                               self.drive_name.decode('utf8', errors='replace')[0],
+                               self.drive_sname.decode('utf8', errors='replace')[0])
 
     def moved(self, db, addr, inside):
         status = Card.INSIDE if inside else Card.OUTSIDE

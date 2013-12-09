@@ -46,7 +46,7 @@ class Tariff(QObject):
         self.fields = fields
 
         self._id = int(fields[0])
-        self._title = fields[1].decode('utf8')
+        self._title = fields[1].decode('utf8', errors='replace')
         self._type = int(fields[2])
         self._interval = int(fields[3])
         try:
@@ -55,7 +55,7 @@ class Tariff(QObject):
             self.cost = [int(i) for i in fields[4].split(' ')]
         self.zero_time = [int(i, 10) for i in fields[5].split(':')] if fields[5] != 'None' else None
         self.max_per_day = int(fields[6]) if fields[6] != 'None' else None
-        self._note = fields[7].decode('utf8')
+        self._note = fields[7].decode('utf8', errors='replace')
 
     FREE_TIME = 60*15
 
@@ -102,6 +102,10 @@ class Tariff(QObject):
     def costInfo(self):
         return str(self.cost) if isinstance(self.cost, int) else ','.join([str(cost) for cost in self.cost[:3]]) + '...'
 
+    @property
+    def cost_db(self):
+        return str(self.cost*100) if isinstance(self.cost, int) else ''
+
     @pyqtProperty(str, constant=True)
     def note(self):
         return self._note
@@ -133,6 +137,10 @@ class FixedTariffResult(object):
             self.price = cost_per_day * (self.units / 24)
             self.price += min((self.units % 24)*cost, max_per_day)
 
+    @property
+    def interval(self):
+        return u'%i доб. %i год. %i хв.' % (self.days, self.hours, self.minutes)
+
     def __unicode__(self):
         return u'Единиц оплаты: %i' % (self.units,)
 
@@ -146,6 +154,8 @@ class FixedTariff(Tariff):
     >>> tariff = Tariff.create(['1', 'Час 1 грн.', '1', '1', '1', 'None', 'None', 'None'])
     >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,10,0))
     (0, 0, 10, 0, 0)
+    >>> tariff.calc(datetime(2013,10,31,22,0,0), datetime(2013,11,01,9,0,0))
+    (0, 11, 0, 11, 11)
     >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,45,0))
     (0, 0, 45, 1, 1)
     >>> tariff.calc(datetime(2013,10,28,9,0,0), datetime(2013,10,28,14,45,0))
@@ -198,6 +208,10 @@ class DynamicTariffResult(object):
             self.price = cost_per_day * (self.units / 24)
             self.price += min(max_per_day, sum(price for _, price in izip(xrange(int(self.units % 24)), cycle(cost))))
         self.cost = self.price
+
+    @property
+    def interval(self):
+        return u'%i доб. %i год. %i хв.' % (self.days, self.hours, self.minutes)
 
     def __unicode__(self):
         return u'Единиц оплаты: %i' % (self.units,)

@@ -165,19 +165,21 @@ drop table terminal_remote;''')
 class DB(QObject):
     free_places_update = pyqtSignal(int)
 
+    STRINGS_UPDATE_INTERVAL = 60  # seconds
+
     def __init__(self, host='10.0.2.247', port=101, notify=None, parent=None):
         QObject.__init__(self, parent)
 
         self.addr = (host, port)
-        self._strings = [
-            'ТОВ "КАРД-СIСТЕМС"',
-            'м. Київ',
-            'проспект перемоги, 123',
-            '(+380 44) 284 0888',
-            'ЗРАЗОК',
-            'УВАГА! Талон не згинати',
-            'ЗА ВТРАТУ ТАЛОНУ ШТРАФ',
-            '',
+        self._strings = None, [
+            u'ТОВ "КАРД-СIСТЕМС"',
+            u'м. Київ',
+            u'проспект перемоги, 123',
+            u'(+380 44) 284 0888',
+            u'ЗРАЗОК',
+            u'УВАГА! Талон не згинати',
+            u'ЗА ВТРАТУ ТАЛОНУ ШТРАФ',
+            u'',
         ]
         self.notify = notify
         self.local = LocalDB()
@@ -196,7 +198,7 @@ class DB(QObject):
             print e.__class__.__name__, e
             if self.notify:
                 #self.notify(u'Ошибка БД', u'Нет связи с удалённой базой данных')
-                self.notify(_("Database Error"), q.decode('utf8'))
+                self.notify(_("Database Error"), q.decode('utf8', errors='replace'))
             return False
 
         if answer == 'FAIL':
@@ -216,7 +218,7 @@ class DB(QObject):
         ret = self.query('select terminal_id,title from terminal')
         if ret:
             self.local.update_terminals(ret)
-        return dict((int(key), value.decode('utf8')) for key, value in self.local.get_terminals())
+        return dict((int(key), value.decode('utf8', errors='replace')) for key, value in self.local.get_terminals())
 
     def get_tariffs(self):
         ret = self.query('select * from tariff')
@@ -269,11 +271,24 @@ class DB(QObject):
 
         return self.query(self.PASS_QUERY % args, local=True)
 
+    CONFIG_QUERY = 'select userstr1,userstr2,userstr3,userstr4,userstr5,userstr6,userstr7,userstr8 from config'
+
     def get_config_strings(self):
-        ret = self.query('select userstr1,userstr2,userstr3,userstr4,userstr5,userstr6,userstr7,userstr8 from config')
-        if ret:
-            self._strings = ret[0]
-        return [s.decode('utf8', errors='replace') for s in self._strings]
+        now = datetime.now()
+        if self._strings[0] is None or (now - self._strings[0]).total_seconds() > self.STRINGS_UPDATE_INTERVAL:
+            ret = self.query(self.CONFIG_QUERY)
+            if ret:
+                self._strings = datetime.now(), [s.decode('utf8', errors='replace') for s in ret[0]]
+        return self._strings[1]
+
+    def get_check_header(self):
+        return u'<c>' + u'\n'.join([
+            u'<hr />',
+            u'Автоматизизована система',
+            u'платного паркування',
+            u'"STOP-Park"',
+            u'<hr />'
+        ] + self.get_config_strings()[:4]) + u'\n<hr /></c>\n'
 
     PAYMENT_QUERY = 'insert into payment values(NULL,"%s",%i,%i,"%s","%s","%s",%i,%i,%i*100,%i,"%s","%s",%i*100)'
 
