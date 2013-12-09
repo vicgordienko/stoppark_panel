@@ -58,6 +58,12 @@ class CardPayment(Payment):
 
         return db.generate_payment(card_payment=self)
 
+    def check(self, db):
+        """
+        This method should do nothing for card payments.
+        """
+        pass
+
 
 class CardPaymentUnsupported(Payment):
     def __init__(self, card):
@@ -70,13 +76,23 @@ class CardPaymentUnsupported(Payment):
 
 
 class Card(QObject):
+    """
+    This is a Card class that represents contactless card from remote database.
+    There are many card types, and every one of them is subject to a set of rules.
+
+    Only CLIENT cards can generate payments.
+    CLIENT and STAFF cards can pass through parking gates (if check method considers their state appropriate).
+
+    Only CASHIER cards can open sessions and only same CASHIER (or ADMIN, if there is no cashier nearby) can close it.
+    """
+
     STAFF = 0
     ONCE = 1
     CLIENT = 2
     CASHIER = 3
     ADMIN = 4
 
-    ALLOWED_TYPE = [ONCE, CLIENT]
+    ALLOWED_TYPE = [ONCE, CLIENT, STAFF]
 
     ALLOWED = 1
     LOST = 2
@@ -134,11 +150,9 @@ class Card(QObject):
         self.tariff_sum = fields[18]
 
     def check(self, direction):
-        if self.type not in [Card.STAFF, Card.CLIENT]:
+        if self.type not in self.ALLOWED_TYPE:
             return False
         if self.status not in self.ALLOWED_STATUS[direction]:
-            return False
-        if self.type not in self.ALLOWED_TYPE:
             return False
 
         if self.date_reg is None or self.date_end is None:
