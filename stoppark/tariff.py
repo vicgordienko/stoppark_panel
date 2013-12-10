@@ -186,21 +186,12 @@ class FixedTariff(Tariff):
     (0, 1, 0, 1, 1)
     >>> tariff.calc(datetime(2013,12,9,10,0,0), datetime(2013,12,9,10,15,1))
     (0, 0, 15, 1, 1)
-
-    #transfer time     (0, 3, 0, 3, 3)
     >>> tariff.calc(datetime(2013,10,26,23,0,0), datetime(2013,10,27,1,0,0))
     (0, 2, 0, 2, 2)
-
-    #typo date
     >>> tariff.calc(datetime(2013,10,24,9,0,0), datetime(2013,10,21,10,0,0))
     (-3, 1, 0, 0, 0)
-
-    #typo time (0, 0, -10, 0, 0) - must be only -10 min
     >>> tariff.calc(datetime(2013,10,24,9,0,0), datetime(2013,10,24,8,50,0))
     (-1, 23, 50, 0, 0)
-
-    #unreal date - error but want to see     (0, 0, 0, 0, 0)
-    #>>> tariff.calc(datetime(2013,11,31,9,0,0), datetime(2013,12,1,9,50,0))
 
     >>> tariff = Tariff.create(['1', 'Час 1 грн. X', '1', '2', '1', '09:00', 'None', 'None'])
     >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,11,10,0))
@@ -225,18 +216,10 @@ class FixedTariff(Tariff):
     (32, 2, 10, 33, 33)
     >>> tariff.calc(datetime(2013,12,1,9,0,0), datetime(2014,11,1,10,10,0))
     (335, 1, 10, 336, 336)
-
-    #typo date
     >>> tariff.calc(datetime(2013,12,3,9,0,0), datetime(2013,12,1,9,0,0))
     (-2, 0, 0, 0, 0)
-
-    #typo time (0, 0, -10, 0, 0) - must be omly -10 min
     >>> tariff.calc(datetime(2013,10,24,9,0,0), datetime(2013,10,24,8,50,0))
     (-1, 23, 50, 0, 0)
-
-    #unreal date - error but want to see     (0, 0, 0, 0, 0)
-    #>>> tariff.calc(datetime(2013,11,31,9,0,0), datetime(2013,12,1,9,50,0))
-
 
     >>> tariff = Tariff.create(['1', 'Час 1 грн.', '1', '1', '1', 'None', '100', 'None'])
     >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,16,20,0))
