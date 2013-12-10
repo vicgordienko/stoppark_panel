@@ -195,6 +195,7 @@ class TerminalBarcode(DumpableStructure):
     BAR_NO = 0x02
 
     TIMEOUT = 40
+    LEAVE_TIMEOUT = 200
 
     #noinspection PyMissingConstructor
     def __init__(self, addr):
@@ -215,7 +216,7 @@ class TerminalBarcode(DumpableStructure):
                 mainloop.notify.emit(_('BAR Access denied.'), u'%s' % (ticket.bar,))
                 TerminalMessage(_('BAR Access denied.')).set(terminal, self.addr)
 
-        if self.status == self.BAR_LEFT and self.time < self.TIMEOUT:
+        if self.status == self.BAR_LEFT and self.time < self.LEAVE_TIMEOUT:
             ticket = mainloop.db.get_ticket(self.code)
             if ticket and ticket.check():
                 mainloop.notify.emit(_('BAR Left'), u'%s' % (ticket.bar,))

@@ -47,13 +47,27 @@ class Tariff(QObject):
 
         self._id = int(fields[0])
         self._title = fields[1].decode('utf8', errors='replace')
+
         self._type = int(fields[2])
+        if self._type not in Tariff.TYPES.keys():
+            raise KeyError("There is no such tariff type: %i" % (self._type,))
+
         self._interval = int(fields[3])
+        if self._interval not in Tariff.DIVISORS.keys():
+            raise KeyError("There is not such interval: %i" % (self._interval,))
+
         try:
             self.cost = int(fields[4])
         except ValueError:
             self.cost = [int(i) for i in fields[4].split(' ')]
-        self.zero_time = [int(i, 10) for i in fields[5].split(':')] if fields[5] != 'None' else None
+
+        if fields[5] != 'None':
+            self.zero_time = [int(i, 10) for i in fields[5].split(':')]
+            if len(self.zero_time) != 2:
+                raise IndexError("Incorrect zero time: %s" % (fields[5]))
+        else:
+            self.zero_time = None
+
         self.max_per_day = int(fields[6]) if fields[6] != 'None' else None
         self._note = fields[7].decode('utf8', errors='replace')
 
