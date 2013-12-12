@@ -68,7 +68,7 @@
       <item>
        <widget class="QPushButton" name="print_check">
         <property name="text">
-         <string>Печать</string>
+         <string>Печать временного отчёта</string>
         </property>
        </widget>
       </item>

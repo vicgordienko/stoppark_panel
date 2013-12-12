@@ -24,6 +24,8 @@ class Tariff(QObject):
     PREPAID = 5
     SUBSCRIPTION = 6
 
+    FREE_TIME = 60*15
+
     TYPES = {}
 
     @staticmethod
@@ -35,11 +37,13 @@ class Tariff(QObject):
 
     @staticmethod
     def create(response):
+        if response is False:
+            return False
         try:
             assert(len(response) >= 8)
             return Tariff.TYPES.get(int(response[2]), Tariff)(response)
-        except (ValueError, TypeError, AssertionError):
-            return False
+        except (TypeError, AssertionError, IndexError, ValueError):
+            return None
 
     def __init__(self, fields):
         QObject.__init__(self)
@@ -54,7 +58,7 @@ class Tariff(QObject):
 
         self._interval = int(fields[3])
         if self._interval not in Tariff.DIVISORS.keys():
-            raise KeyError("There is not such interval: %i" % (self._interval,))
+            raise KeyError("There is no such interval: %i" % (self._interval,))
 
         try:
             self.cost = int(fields[4])
@@ -70,8 +74,6 @@ class Tariff(QObject):
 
         self.max_per_day = int(fields[6]) if fields[6] != 'None' else None
         self._note = fields[7].decode('utf8', errors='replace')
-
-    FREE_TIME = 60*15
 
     def calc_units(self, begin, end):
         """

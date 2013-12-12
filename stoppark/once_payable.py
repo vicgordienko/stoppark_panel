@@ -46,10 +46,16 @@ class OncePaymentUnsupported(Payment):
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
+        """
+        When OncePayable doesn't support given tariff, no message should be present.
+        """
         return u''
 
 
 class OncePayable(QObject):
+    """
+    Its a default Payable concept, used when there is no other Payables present.
+    """
     def __init__(self):
         QObject.__init__(self)
         self.payments = []

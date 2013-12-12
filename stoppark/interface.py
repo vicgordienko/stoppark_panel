@@ -1,4 +1,68 @@
 ﻿# coding=utf-8
+"""
+This module contains a set of classes that interact with terminals.
+There are two levels of abstraction in this module:
+1. Low-level ctypes bindings to underlying shared library,
+   that communicates with physical devices using their protocol.
+   This level utilizes u2py.interface.BaseReader to perform connection to local serial port device.
+   Fail-safe mechanics are also implemented here in `check` function.
+2. Middle-level set of classes each encapsulating an operation of sending a specific command to a given terminals
+   and handling its response. There are two kinds of classes that differ by their purpose:
+   1. Processor classes.
+      Those classes serve as regularly executed tasks.
+      They are usually implemented as direct or indirect descendants of ctypes.Structure. Their ctypes-part
+      holds binary structure of response to the specific terminal command they handle.
+      Processor classes must implement `process` method with two mandatory arguments:
+      def process(self, terminal, mainloop):
+          '''
+          @return: status of process execution. True if process had been completed successfully and False otherwise.
+          @rtype : bool
+          @param terminal: instance of Terminal class (u2py.interface.BaseReader alias).
+                           This object represents terminal network.
+                           It is by using this object that low-level bindings of previous logical level can be executed.
+          @param mainloop: instance of mainloop.Mainloop class.
+                           This object can be used to communicate with external world (namely remote database
+                           and user interface). There are a bunch of useful attributes in this class:
+                           + db: db.DB instance, that represents remote database.
+                           + notify: pyqtSignal, that can be emitted to notify operator about some event.
+                           It should be noted though, that despite there are other attributes and methods
+                           in this object, only two aforementioned can be used without the risk of changing interface.
+          '''
+          ...
+
+      Those classes are actively used by mainloop module as part of normal terminal-interaction.
+      Only classes, that strictly follow aforementioned requirements, are used in mainloop module.
+   2. Action classes.
+      Those classes embody the concept of an action that must be applied to the given terminal.
+      E.g.: setting new terminal state, making
+      Action classes must implement `set` method:
+      def set(self, terminal, addr):
+          '''
+          @return result of underlying low-level command execution.
+          @rtype: int
+          @param terminal: same as terminal parameter described in `process` docstring before.
+          @param addr: int, address of terminal in terminal network. This parameter defines which terminal will be the
+                            target of this command.
+          There may be other parameters here, depending on the nature of action.
+          '''
+          ...
+
+      Initialization of action is unique for every one of them. Their constructor serves as a place, where some
+      time hungry operations can be executed to alleviate the burden on mainloop.
+      While it's possible to transmit everything through the parameters of `set` method,
+      most of actions have some kind of state, immutable between multiple applications of their `set` method.
+      Thus its possible to apply the same Action to a specific set of terminals
+      (since there is broadcasting support in terminal protocol, 0xFF address can handle the case of ALL terminals).
+
+   The main difference between Processor and Action classes lies in the way they are utilized:
+   while Processors are designed to be executed regularly, Actions are usually one-off operations.
+   Thus, Processors are embedded into mainloop, and Actions can be triggered by both Processors and operator.
+
+   It should be noted, that all operations with Terminal object must be done synchronously.
+   Despite mainloop module utilizing strategy, that completely excludes such situation
+   during terminal command interleaving, Processor classes should never start a thread
+   that may interact with terminal asynchronously.
+"""
 from u2py.interface_basis import load, BaseReader as Terminal, DumpableStructure, DumpableBigEndianStructure, ByteArray
 from u2py.interface import ReaderError
 from ctypes import POINTER as P, c_uint16, c_uint8, c_char, c_char_p, Structure
@@ -8,6 +72,11 @@ _ = language.ugettext
 
 
 class TerminalEntries(Structure):
+    """
+    Processor.
+    This class holds structure of response to the terminal_get_entries command('G').
+    """
+
     _fields_ = [
         ('dts11', c_uint8, 1),
         ('dts12', c_uint8, 1),
@@ -45,6 +114,13 @@ class TerminalEntries(Structure):
         })
 
     def process(self, terminal, mainloop, reset=True):
+        """
+        This method executes terminal_get_entries command and processes its result.
+        Result processing includes:
+        + checking stp_* flags and either issuing appropriate configuration command to device or notifying operator.
+        + adjusting free places counter using provided database and generating pass events for it.
+        + broadcasting information about free places to all terminals in network.
+        """
         if terminal_get_entries(terminal, self.addr, self):
             return False
         if reset:
@@ -55,6 +131,12 @@ class TerminalEntries(Structure):
 
         if not self.stp_mes:
             TerminalStrings(mainloop.db).set(terminal, self.addr)
+
+        if self.stp_paper_near:
+            mainloop.notify.emit(_('Notification'), _('Paper near at terminal %i') % (self.addr,))
+
+        if self.stp_paper_no:
+            mainloop.notify.emit(_('Notification'), _('No paper Paper near at terminal %i') % (self.addr,))
 
         free_places_diff = self.out_count - self.in_count
         if free_places_diff:

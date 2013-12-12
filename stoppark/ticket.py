@@ -193,7 +193,7 @@ class Ticket(QObject):
             fields = response[0]
             assert (len(fields) >= 12)
             return Ticket(fields)
-        except (TypeError, AssertionError):
+        except (TypeError, AssertionError, IndexError, ValueError):
             return None
 
     @staticmethod

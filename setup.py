@@ -1,8 +1,9 @@
 from distutils.core import setup
+import stoppark
 
 setup(
     name='stoppark',
-    version='0.10.279',
+    version=stoppark.__version__,
     author='feanor',
     author_email='std.feanor@gmail.com',
     packages=['stoppark'],

@@ -134,10 +134,11 @@ class LocalDB(object):
         with self.conn as c:
             c.executescript('create table terminal_remote (id integer primary key, title text);')
             c.executemany('insert into terminal_remote values(?,?)', terminals)
-            c.executescript('''delete from terminal where id not in (select id from terminal_remote);
-insert into terminal(id,title) select id,title from terminal_remote where id not in (select id from terminal);
-update terminal set title = (select title from terminal_remote where id = terminal.id);
-drop table terminal_remote;''')
+            c.executescript('delete from terminal where id not in (select id from terminal_remote);'
+                            'insert into terminal(id,title) select id,title from terminal_remote '
+                            'where id not in (select id from terminal);'
+                            'update terminal set title = (select title from terminal_remote where id = terminal.id);'
+                            'drop table terminal_remote;')
 
     def get_terminals_id_by_option(self, option):
         return [int(row[0]) for row in self.query('select id from terminal where option = "%s"' % (option,))]
@@ -224,7 +225,7 @@ class DB(QObject):
         ret = self.query('select * from tariff')
         if ret:
             self.local.update_tariffs(ret)
-        return [Tariff.create(t) for t in self.local.get_tariffs()]
+        return filter(lambda x: x is not None, [Tariff.create(t) for t in self.local.get_tariffs()])
 
     def get_total_places(self):
         ret = self.query('select PlaceNum from config')

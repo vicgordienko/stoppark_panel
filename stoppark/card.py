@@ -59,10 +59,20 @@ class CardPayment(Payment):
         return db.generate_payment(card_payment=self)
 
     def check(self, db):
-        """
-        This method should do nothing for card payments.
-        """
-        pass
+        interval = {Tariff.HOURLY: u'год.', Tariff.DAILY: u'доб.', Tariff.MONTHLY: u'міс.'}[self.tariff.interval]
+
+        return Payment.check(self, db) + u'\n'.join([
+            u'Картка %s' % (self.card.sn,),
+            u'%s: %s грн./%s' % (self.tariff.title, self.tariff.costInfo, interval),
+            u'До поповнення: з %s по %s' % (self.card.date_reg.strftime(DATE_USER_FORMAT),
+                                            self.card.date_end.strftime(DATE_USER_FORMAT)),
+            u'Поповнення на %i %s' % (self.result.units, interval),
+            u'<hr />',
+            u'Після поповнення: з %s по %s' % (self.result.begin.strftime(DATE_USER_FORMAT),
+                                               self.result.end.strftime(DATE_USER_FORMAT)),
+            u'Вартість: %s грн.' % (self.price,),
+            u'<hr />'
+        ])
 
 
 class CardPaymentUnsupported(Payment):
@@ -114,7 +124,7 @@ class Card(QObject):
             fields = response[0]
             assert(len(fields) >= 19)
             return Card(fields)
-        except (ValueError, TypeError, AssertionError):
+        except (TypeError, AssertionError, IndexError, ValueError):
             return None
 
     @staticmethod
