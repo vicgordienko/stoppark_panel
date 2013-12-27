@@ -28,12 +28,17 @@ class TicketPayment(Payment):
     def price(self):
         return self.result.price
 
+    @property
+    def paid_until(self):
+        return self.ticket.time_in + self.result.paid_time
+
     @pyqtProperty(str, constant=True)
     def explanation(self):
         if not self._enabled:
             return u'!Талон %s.\nНевозможно оплатить по этому тарифу.' % (self.ticket.bar,)
         return u'Оплата по талону %s.\n' \
                u'Время вьезда: %s.\n%s' \
+               u'Длительность: %s' % (self.result.interval,) \
                % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT), self.result)
 
     def vfcd_explanation(self):
@@ -47,7 +52,7 @@ class TicketPayment(Payment):
 
     def execute(self, db):
         ticket_args = (self.tariff.id, self.tariff.cost_db, self.result.price,
-                       self.now.strftime(DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
+                       self.paid_until, Ticket.PAID, self.ticket.bar)
         ret = db.query(self.TICKET_QUERY % ticket_args) is None
         if not ret:
             return ret
@@ -60,8 +65,9 @@ class TicketPayment(Payment):
         return Payment.check(self, db) + u'\n'.join([
             u' в\'їзд: %s' % (self.ticket.time_in.strftime(DATETIME_USER_FORMAT),),
             u'оплата: %s' % (self.now.strftime(DATETIME_USER_FORMAT),),
-            u'тривалість паркування: %s' % (self.result.interval,),
             u'тариф: %s грн./%s' % (self.tariff.costInfo, interval),
+            u'тривалість паркування: %s' % (self.result.interval_u,),
+            u'оплачено до: %s' % (self.paid_until.strftime(DATETIME_USER_FORMAT),),
             u'<hr />',
             u'Вартість: %s грн.' % (self.price,),
             u'<hr />',
@@ -93,6 +99,10 @@ class TicketExcessPayment(Payment):
     def price(self):
         return self.result.price
 
+    @property
+    def paid_until(self):
+        return self.ticket.time_base_time + self.result.paid_time
+
     @pyqtProperty(str, constant=True)
     def explanation(self):
         if not self._enabled:
@@ -100,10 +110,9 @@ class TicketExcessPayment(Payment):
         return u'Доплата по талону %s.\n' \
                u'Время вьезда: %s.\n' \
                u'Последняя оплата: %s.\n%s' \
+               u'С последней оплаты: %s' % (self.result.interval,) \
                % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT),
                   self.base_time.strftime(DATETIME_USER_FORMAT), self.result)
-
-    TICKET_QUERY = 'update ticket set summdopl = summdopl + %i*100, timedopl="%s", status = status | %i where bar="%s"'
 
     def vfcd_explanation(self):
         return [
@@ -111,8 +120,10 @@ class TicketExcessPayment(Payment):
             u'Доплата: %i грн.' % (self.price,)
         ]
 
+    TICKET_QUERY = 'update ticket set summdopl = summdopl + %i*100, timedopl="%s", status = status | %i where bar="%s"'
+
     def execute(self, db):
-        args = (self.result.price, self.now.strftime(DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
+        args = (self.result.price, self.paid_until, Ticket.PAID, self.ticket.bar)
         ret = db.query(self.TICKET_QUERY % args) is None
         if not ret:
             return ret
@@ -125,8 +136,9 @@ class TicketExcessPayment(Payment):
         return Payment.check(self, db) + u'\n'.join([
             u'остання оплата: %s' % (self.base_time.strftime(DATETIME_USER_FORMAT),),
             u'       доплата: %s' % (self.now.strftime(DATETIME_USER_FORMAT),),
-            u'тривалість паркування: %s' % (self.result.interval,),
             u'тариф: %s грн./%s' % (self.tariff.costInfo, interval),
+            u'тривалість паркування: %s' % (self.result.interval_u,),
+            u'оплачено до: %s' % (self.paid_until.strftime(DATETIME_USER_FORMAT),),
             u'<hr />',
             u'Вартість: %s грн.' % (self.price,),
             u'<hr />',

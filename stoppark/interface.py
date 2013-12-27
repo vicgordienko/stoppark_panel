@@ -132,11 +132,11 @@ class TerminalEntries(Structure):
         if not self.stp_mes:
             TerminalStrings(mainloop.db).set(terminal, self.addr)
 
-        if self.stp_paper_near:
-            mainloop.notify.emit(_('Notification'), _('Paper near at terminal %i') % (self.addr,))
+        #if self.stp_paper_near:
+        #    mainloop.notify.emit(_('Notification'), _('Paper near at terminal %i') % (self.addr,))
 
-        if self.stp_paper_no:
-            mainloop.notify.emit(_('Notification'), _('No paper Paper near at terminal %i') % (self.addr,))
+        #if self.stp_paper_no:
+        #    mainloop.notify.emit(_('Notification'), _('No paper Paper near at terminal %i') % (self.addr,))
 
         free_places_diff = self.out_count - self.in_count
         if free_places_diff:

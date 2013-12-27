@@ -1,16 +1,16 @@
 from unittest import TestCase
-from tariff import Tariff
+from tariff import Tariff, FixedTariff, DynamicTariff
 from datetime import datetime, timedelta
 
 
 class TestFixedTariff(TestCase):
-    def test_incorrect_tariffs(self):
-        self.assertRaises(ValueError, Tariff, ['1', 'Hourly tariff', 'fail', '1', '1', 'None', 'None', 'None'])
-        self.assertRaises(ValueError, Tariff, ['1', 'Hourly tariff', '1', 'fail', '1', 'None', 'None', 'None'])
-        self.assertRaises(IndexError, Tariff, ['1', 'Special daily tariff', '1', '1', '1', '123', 'None', 'None'])
+    def test_incorrect_init(self):
+        self.assertRaises(ValueError, FixedTariff, ['1', 'Hourly tariff', 'fail', '1', '1', 'None', 'None', 'None'])
+        self.assertRaises(ValueError, FixedTariff, ['1', 'Hourly tariff', '1', 'fail', '1', 'None', 'None', 'None'])
+        self.assertRaises(IndexError, FixedTariff, ['1', 'Special daily tariff', '1', '1', '1', '123', 'None', 'None'])
 
-        self.assertRaises(KeyError, Tariff, ['1', 'Hourly tariff', '100', '1', '1', 'None', 'None', 'None'])
-        self.assertRaises(KeyError, Tariff, ['1', 'Hourly tariff', '1', '100', '1', 'None', 'None', 'None'])
+        self.assertRaises(KeyError, FixedTariff, ['1', 'Hourly tariff', '100', '1', '1', 'None', 'None', 'None'])
+        self.assertRaises(KeyError, FixedTariff, ['1', 'Hourly tariff', '1', '100', '1', 'None', 'None', 'None'])
 
     def test_tariff_create(self):
         a = Tariff.create(['1', 'Hourly tariff', '1', '1', '1', 'None', 'None', 'None'])
@@ -58,3 +58,8 @@ class TestFixedTariff(TestCase):
                          (1, 2, 0, 3, 300))
         self.assertEqual(extract(tariff.calc(datetime(2013, 10, 31, 6, 0, 0), datetime(2013, 11, 3, 12, 0, 0))),
                          (3, 6, 0, 5, 500))
+
+
+class TestDynamicTariff(TestCase):
+    def test_incorrect_init(self):
+        self.assertRaises(ValueError, DynamicTariff, ['1', 'Dynamic', '2', '2', '1', 'None', 'None', 'None'])

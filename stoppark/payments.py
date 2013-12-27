@@ -308,6 +308,11 @@ class Payments(QWidget):
 
     def end_session(self):
         print 'end_session'
+        try:
+            self.reader.new_payable.disconnect(self.handle_payable)
+        except TypeError:  # .disconnect raises TypeError when given signal is not connected
+            pass
+
         self.session = None
         self.session_end.emit()
 

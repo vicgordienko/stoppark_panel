@@ -298,9 +298,12 @@ class DB(QObject):
             print 'No payment to generate.'
             return None
 
+        session = self.local.session()
+        operator = session[1] if session is not None else '?'
+
         if ticket_payment:
             payment_args = ("Talon payment", ticket_payment.tariff.id, 0,
-                            'Кассир', datetime.now().strftime(DATETIME_FORMAT),
+                            operator, datetime.now().strftime(DATETIME_FORMAT),
                             ticket_payment.ticket.bar, Ticket.PAID, ticket_payment.tariff.id,
                             ticket_payment.result.cost, ticket_payment.result.units,
                             ticket_payment.ticket.time_in.strftime(DATETIME_FORMAT),
@@ -311,7 +314,7 @@ class DB(QObject):
         if once_payment:
             now = datetime.now().strftime(DATETIME_FORMAT)
             payment_args = ('Single payment', once_payment.tariff.id, 0,
-                            'Кассир', now,
+                            operator, now,
                             '', 0, once_payment.tariff.id,
                             once_payment.price, 1,
                             now, now, once_payment.price)
@@ -321,7 +324,7 @@ class DB(QObject):
         if card_payment:
             now = datetime.now().strftime(DATETIME_FORMAT)
             payment_args = ('Card payment', card_payment.tariff.id, 0,
-                            'Кассир', now,
+                            operator, now,
                             card_payment.card.sn, Ticket.PAID, card_payment.tariff.id,
                             card_payment.result.cost, card_payment.result.units,
                             card_payment.result.begin, card_payment.result.end,
