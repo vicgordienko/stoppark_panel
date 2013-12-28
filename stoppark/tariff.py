@@ -175,6 +175,8 @@ class FixedTariffResult(object):
         self.paid_time = tariff.paid_time(self.units) + (extra_time if extra_time is not None else timedelta(0))
         if extra_units is not None:
             self.units += extra_units
+        if self.units == 0:
+            self.paid_time = delta
         self.cost = tariff.cost
 
         self.price = self.units * tariff.cost
@@ -196,7 +198,7 @@ class FixedTariffResult(object):
         return u'%i дн. %i час. %i мин.' % (self.days, self.hours, self.minutes)
 
     def __unicode__(self):
-        return u'Единиц оплаты: %i' % (self.units,)
+        return u'Длительность: %s.\nЕдиниц оплаты: %i' % (self.interval, self.units,)
 
     def __repr__(self):
         return str((self.days, self.hours, self.minutes, self.units, self.paid_time, self.price))
@@ -207,7 +209,7 @@ class FixedTariff(Tariff):
     """
     >>> tariff = Tariff.create(['1', 'Час 1 грн.', '1', '1', '1', 'None', 'None', 'None'])
     >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,10,0))
-    (0, 0, 10, 0, datetime.timedelta(0), 0)
+    (0, 0, 10, 0, datetime.timedelta(0, 600), 0)
     >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,45,0))
     (0, 0, 45, 1, datetime.timedelta(0, 3600), 1)
     >>> tariff.calc(datetime(2013,10,28,9,0,0), datetime(2013,10,28,14,45,0))
@@ -223,7 +225,7 @@ class FixedTariff(Tariff):
     >>> tariff.calc(datetime(2008,2,28,23,30,0), datetime(2008,3,1,2,0,0))
     (1, 2, 30, 27, datetime.timedelta(1, 10800), 27)
     >>> tariff.calc(datetime(2013,11,30,23,55,0), datetime(2013,12,1,0,5,0))
-    (0, 0, 10, 0, datetime.timedelta(0), 0)
+    (0, 0, 10, 0, datetime.timedelta(0, 600), 0)
     >>> tariff.calc(datetime(2013,10,30,23,50,0), datetime(2013,10,31,1,0,0))
     (0, 1, 10, 1, datetime.timedelta(0, 3600), 1)
     >>> tariff.calc(datetime(2013,9,30,22,0,0), datetime(2013,10,1,9,0,0))
@@ -243,9 +245,9 @@ class FixedTariff(Tariff):
     >>> tariff.calc(datetime(2013,10,26,23,0,0), datetime(2013,10,27,1,0,0))
     (0, 2, 0, 2, datetime.timedelta(0, 7200), 2)
     >>> tariff.calc(datetime(2013,10,24,9,0,0), datetime(2013,10,21,10,0,0))
-    (-3, 1, 0, 0, datetime.timedelta(0), 0)
+    (-3, 1, 0, 0, datetime.timedelta(-3, 3600), 0)
     >>> tariff.calc(datetime(2013,10,24,9,0,0), datetime(2013,10,24,8,50,0))
-    (-1, 23, 50, 0, datetime.timedelta(0), 0)
+    (-1, 23, 50, 0, datetime.timedelta(-1, 85800), 0)
 
     >>> tariff = Tariff.create(['1', 'Час 1 грн. X', '1', '2', '1', '09:00', 'None', 'None'])
     >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,11,10,0))
@@ -269,9 +271,9 @@ class FixedTariff(Tariff):
     >>> tariff.calc(datetime(2013,12,1,9,0,0), datetime(2014,11,1,10,10,0))
     (335, 1, 10, 336, datetime.timedelta(336), 336)
     >>> tariff.calc(datetime(2013,12,3,9,0,0), datetime(2013,12,1,9,0,0))
-    (-2, 0, 0, 0, datetime.timedelta(0), 0)
+    (-2, 0, 0, 0, datetime.timedelta(-2), 0)
     >>> tariff.calc(datetime(2013,10,24,9,0,0), datetime(2013,10,24,8,50,0))
-    (-1, 23, 50, 0, datetime.timedelta(0), 0)
+    (-1, 23, 50, 0, datetime.timedelta(-1, 85800), 0)
 
     >>> tariff = Tariff.create(['1', 'Час 1 грн.', '1', '1', '1', 'None', '100', 'None'])
     >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,16,20,0))
@@ -315,7 +317,10 @@ class DynamicTariffResult(object):
         self.hours = int(floor(delta.seconds / 3600))
         self.minutes = int(floor((delta.seconds % 3600) / 60))
         self.units = units
-        self.paid_time = tariff.paid_time(self.units) + (extra_time if extra_time is not None else timedelta(0))
+        if self.units == 0:
+            self.paid_time = delta
+        else:
+            self.paid_time = tariff.paid_time(self.units) + (extra_time if extra_time is not None else timedelta(0))
 
         self.price = sum(price for _, price in izip(xrange(int(units)), cycle(tariff.cost)))
         if tariff.max_per_day is not None and self.price > tariff.max_per_day:
@@ -346,7 +351,7 @@ class DynamicTariff(Tariff):
     This tariff can only have hour interval.
     >>> tariff = Tariff.create(['2', '', '2', '1', ' '.join(str(i) for i in range(1,25)), 'None', 'None', 'None'])
     >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,10,0))
-    (0, 0, 10, 0, datetime.timedelta(0), 0)
+    (0, 0, 10, 0, datetime.timedelta(0, 600), 0)
     >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,45,0))
     (0, 0, 45, 1, datetime.timedelta(0, 3600), 1)
     >>> tariff.calc(datetime(2013,10,28,9,0,0), datetime(2013,10,28,14,45,0))

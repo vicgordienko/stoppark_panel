@@ -46,6 +46,19 @@ class CardPayment(Payment):
             u'Оплата: %s грн.' % (self.price,)
         ]
 
+    @property
+    def db_payment_args(self):
+        return {
+            'payment': 'Card payment',
+            'tariff': self.tariff.id,
+            'id': self.card.sn,
+            'cost': self.result.cost,
+            'units': self.result.units,
+            'begin': self.result.begin,
+            'end': self.result.end,
+            'price': self.result.price
+        }
+
     CARD_QUERY = 'update card set DTreg="%s",DTend="%s", TarifType=%i, TarifPrice=%i*100, TarifSumm=%i*100 ' \
                  'where CardID="%s"'
 
@@ -56,7 +69,7 @@ class CardPayment(Payment):
         if not ret:
             return ret
 
-        return db.generate_payment(card_payment=self)
+        return db.generate_payment(self.db_payment_args)
 
     def check(self, db):
         interval = {Tariff.HOURLY: u'год.', Tariff.DAILY: u'доб.', Tariff.MONTHLY: u'міс.'}[self.tariff.interval]

@@ -6,7 +6,7 @@ from time import clock as measurement
 from ticket import Ticket
 from card import Card
 from tariff import Tariff
-from config import db_filename, DATETIME_FORMAT
+from config import db_filename, DATETIME_FORMAT, DATETIME_FORMAT_FULL
 import sqlite3
 from i18n import language
 _ = language.ugettext
@@ -187,6 +187,15 @@ class DB(QObject):
 
     @measure
     def query(self, q, local=False):
+        """
+        This is a base function for communication with remote database.
+        @param q: str, query to be executed remotely
+        @param local: bool, this argument defines whether given query will be duplicated on local database
+        @return: None when database returned correct NONE response
+                 False when there was an error during database communication or error during query execution
+                       Those cases are being explicitly notified using self.notify
+                 list of string lists when database reponded with some data
+        """
         if local:
             with self.local.connection() as c:
                 c.execute(q)
@@ -203,7 +212,9 @@ class DB(QObject):
             return False
 
         if answer == 'FAIL':
-            raise Exception('FAIL on query: %s' % (q,))
+            #raise Exception('FAIL on query: %s' % (q,))
+            self.notify(_("Query Error"), q.decode('utf8', errors='replace'))
+            return False
         if answer == 'NONE':
             return None
 
@@ -291,9 +302,20 @@ class DB(QObject):
             u'<hr />'
         ] + self.get_config_strings()[:4]) + u'\n<hr /></c>\n'
 
-    PAYMENT_QUERY = 'insert into payment values(NULL,"%s",%i,%i,"%s","%s","%s",%i,%i,%i*100,%i,"%s","%s",%i*100)'
+    PAYMENT_QUERY = 'insert into payment values(NULL, "{payment}", {tariff}, {console}, "{operator}", ' \
+                    ' "{now}", "{id}", {status}, {tariff}, {cost}*100, {units}, "{begin}", "{end}", {price}*100)'
 
-    def generate_payment(self, ticket_payment=None, card_payment=None, once_payment=None):
+    def generate_payment(self, db_payment_args):
+        session = self.local.session()
+        operator = session[1] if session is not None else '?'
+        now = datetime.now().strftime(DATETIME_FORMAT_FULL)
+
+        return self.query(self.PAYMENT_QUERY.format(console=0, operator=operator, status=Ticket.PAID,
+                                                    now=now, **db_payment_args), local=True) is None
+
+    PAYMENT_QUERY2 = 'insert into payment values(NULL,"%s",%i,%i,"%s","%s","%s",%i,%i,%i*100,%i,"%s","%s",%i*100)'
+
+    def generate_payment2(self, ticket_payment=None, card_payment=None, once_payment=None):
         if ticket_payment is None and card_payment is None and once_payment is None:
             print 'No payment to generate.'
             return None
@@ -306,13 +328,13 @@ class DB(QObject):
                             operator, datetime.now().strftime(DATETIME_FORMAT),
                             ticket_payment.ticket.bar, Ticket.PAID, ticket_payment.tariff.id,
                             ticket_payment.result.cost, ticket_payment.result.units,
-                            ticket_payment.ticket.time_in.strftime(DATETIME_FORMAT),
-                            ticket_payment.now.strftime(DATETIME_FORMAT),
+                            ticket_payment.ticket.time_in.strftime(DATETIME_FORMAT_FULL),
+                            ticket_payment.now.strftime(DATETIME_FORMAT_FULL),
                             ticket_payment.result.price)
             return self.query(self.PAYMENT_QUERY % payment_args, local=True) is None
 
         if once_payment:
-            now = datetime.now().strftime(DATETIME_FORMAT)
+            now = datetime.now().strftime(DATETIME_FORMAT_FULL)
             payment_args = ('Single payment', once_payment.tariff.id, 0,
                             operator, now,
                             '', 0, once_payment.tariff.id,

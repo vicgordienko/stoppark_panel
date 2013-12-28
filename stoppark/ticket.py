@@ -1,12 +1,12 @@
 # coding=utf-8
 from PyQt4.QtCore import QObject, pyqtProperty, pyqtSlot
 from datetime import datetime
-from config import DATETIME_FORMAT, DATETIME_USER_FORMAT
+from config import DATETIME_FORMAT, DATETIME_FORMAT_FULL, DATETIME_USER_FORMAT
 from tariff import Tariff
 from payment import Payment
 
 
-class TicketPayment(Payment):
+class BaseTicketPayment(Payment):
     def __init__(self, ticket, tariff):
         Payment.__init__(self, ticket.payments)
 
@@ -16,9 +16,7 @@ class TicketPayment(Payment):
 
         self.ticket = ticket
         self.tariff = tariff
-
         self.now = datetime.now()
-        self.result = tariff.calc(self.ticket.time_in, self.now)
 
     @pyqtProperty(bool, constant=True)
     def enabled(self):
@@ -27,6 +25,27 @@ class TicketPayment(Payment):
     @pyqtProperty(int, constant=True)
     def price(self):
         return self.result.price
+
+    @property
+    def db_payment_args(self):
+        return {
+            'payment': 'Talon payment',
+            'tariff': self.tariff.id,
+            'id': self.ticket.bar,
+            'cost': self.result.cost,
+            'units': self.result.units,
+            'begin': self.ticket.time_in.strftime(DATETIME_FORMAT_FULL),
+            'end': self.now.strftime(DATETIME_FORMAT_FULL),
+            'price': self.result.price
+        }
+
+
+class TicketPayment(BaseTicketPayment):
+    def __init__(self, ticket, tariff):
+        BaseTicketPayment.__init__(self, ticket, tariff)
+
+        if self._enabled:
+            self.result = tariff.calc(self.ticket.time_in, self.now)
 
     @property
     def paid_until(self):
@@ -38,7 +57,6 @@ class TicketPayment(Payment):
             return u'!Талон %s.\nНевозможно оплатить по этому тарифу.' % (self.ticket.bar,)
         return u'Оплата по талону %s.\n' \
                u'Время вьезда: %s.\n%s' \
-               u'Длительность: %s' % (self.result.interval,) \
                % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT), self.result)
 
     def vfcd_explanation(self):
@@ -52,12 +70,12 @@ class TicketPayment(Payment):
 
     def execute(self, db):
         ticket_args = (self.tariff.id, self.tariff.cost_db, self.result.price,
-                       self.paid_until, Ticket.PAID, self.ticket.bar)
+                       self.paid_until.strftime(DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
         ret = db.query(self.TICKET_QUERY % ticket_args) is None
         if not ret:
             return ret
 
-        return db.generate_payment(ticket_payment=self)
+        return db.generate_payment(self.db_payment_args)
 
     def check(self, db):
         interval = {Tariff.HOURLY: u'год.', Tariff.DAILY: u'доб.', Tariff.MONTHLY: u'міс.'}[self.tariff.interval]
@@ -75,29 +93,14 @@ class TicketPayment(Payment):
         ])
 
 
-class TicketExcessPayment(Payment):
+class TicketExcessPayment(BaseTicketPayment):
     def __init__(self, ticket, tariff, excess=False):
-        Payment.__init__(self, ticket.payments)
+        BaseTicketPayment.__init__(self, ticket, tariff)
 
-        self._enabled = hasattr(tariff, 'calc')
-        if not self._enabled:
-            return
-
-        self.ticket = ticket
-        self.tariff = tariff
-        self.excess = excess
-
-        self.now = datetime.now()
-        self.base_time = self.ticket.time_excess_paid if self.excess else self.ticket.time_paid
-        self.result = tariff.calc(self.base_time, self.now)
-
-    @pyqtProperty(bool, constant=True)
-    def enabled(self):
-        return self._enabled
-
-    @pyqtProperty(int, constant=True)
-    def price(self):
-        return self.result.price
+        if self._enabled:
+            self.excess = excess
+            self.base_time = self.ticket.time_excess_paid if self.excess else self.ticket.time_paid
+            self.result = tariff.calc(self.base_time, self.now)
 
     @property
     def paid_until(self):
@@ -110,7 +113,6 @@ class TicketExcessPayment(Payment):
         return u'Доплата по талону %s.\n' \
                u'Время вьезда: %s.\n' \
                u'Последняя оплата: %s.\n%s' \
-               u'С последней оплаты: %s' % (self.result.interval,) \
                % (self.ticket.bar, self.ticket.time_in.strftime(DATETIME_USER_FORMAT),
                   self.base_time.strftime(DATETIME_USER_FORMAT), self.result)
 
@@ -123,12 +125,12 @@ class TicketExcessPayment(Payment):
     TICKET_QUERY = 'update ticket set summdopl = summdopl + %i*100, timedopl="%s", status = status | %i where bar="%s"'
 
     def execute(self, db):
-        args = (self.result.price, self.paid_until, Ticket.PAID, self.ticket.bar)
+        args = (self.result.price, self.paid_until.strftime(DATETIME_FORMAT), Ticket.PAID, self.ticket.bar)
         ret = db.query(self.TICKET_QUERY % args) is None
         if not ret:
             return ret
 
-        return db.generate_payment(ticket_payment=self)
+        return db.generate_payment(self.db_payment_args)
 
     def check(self, db):
         interval = {Tariff.HOURLY: u'год.', Tariff.DAILY: u'доб.', Tariff.MONTHLY: u'міс.'}[self.tariff.interval]

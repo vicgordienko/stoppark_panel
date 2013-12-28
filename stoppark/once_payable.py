@@ -29,8 +29,21 @@ class OncePayment(Payment):
             u'К оплате: %i грн.' % (self.price,)
         ]
 
+    @property
+    def db_payment_args(self):
+        return {
+            'payment': 'Single payment',
+            'tariff': self.tariff.id,
+            'id': '',
+            'cost': self.price,
+            'units': 1,
+            'begin': '',
+            'end': '',
+            'price': self.price
+        }
+
     def execute(self, db):
-        return db.generate_payment(once_payment=self)
+        return db.generate_payment(self.db_payment_args)
 
     def check(self, db):
         return Payment.check(self, db) + u'\n'.join([
