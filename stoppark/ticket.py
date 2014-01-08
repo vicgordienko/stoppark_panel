@@ -212,7 +212,21 @@ class Ticket(QObject):
 
     @staticmethod
     def parse_bar(bar):
-        return datetime.strptime(str(datetime.now().year) + bar[:10], '%Y%m%d%H%M%S')
+        '''
+        This method currently implements heuristics for detecting year of barcode date.
+        Since there is no information about year on barcode itself, we try to parse barcode as if it has current year
+        and if it fails (no such date) or resulting date is greater than current datetime we try to parse it
+        again with previous year.
+        @param bar: string, barcode from barcode reader
+        @return: datetime.datetime, datetime of ticket moving inside
+        '''
+        try:
+            probable_date = datetime.strptime(str(datetime.now().year) + bar[:10], '%Y%m%d%H%M%S')
+            if probable_date > datetime.now():
+                raise ValueError
+            return probable_date
+        except ValueError:
+            return datetime.strptime(str(datetime.now().year - 1) + bar[:10], '%Y%m%d%H%M%S')
 
     @staticmethod
     def register(db, bar):
