@@ -15,12 +15,12 @@ There are two levels of abstraction in this module:
       Processor classes must implement `process` method with two mandatory arguments:
       def process(self, terminal, mainloop):
           '''
-          @return: status of process execution. True if process had been completed successfully and False otherwise.
-          @rtype : bool
-          @param terminal: instance of Terminal class (u2py.interface.BaseReader alias).
+          return: status of process execution. True if process had been completed successfully and False otherwise.
+          rtype : bool
+          param terminal: instance of Terminal class (u2py.interface.BaseReader alias).
                            This object represents terminal network.
                            It is by using this object that low-level bindings of previous logical level can be executed.
-          @param mainloop: instance of mainloop.Mainloop class.
+          param mainloop: instance of mainloop.Mainloop class.
                            This object can be used to communicate with external world (namely remote database
                            and user interface). There are a bunch of useful attributes in this class:
                            + db: db.DB instance, that represents remote database.
@@ -38,10 +38,10 @@ There are two levels of abstraction in this module:
       Action classes must implement `set` method:
       def set(self, terminal, addr):
           '''
-          @return result of underlying low-level command execution.
-          @rtype: int
-          @param terminal: same as terminal parameter described in `process` docstring before.
-          @param addr: int, address of terminal in terminal network. This parameter defines which terminal will be the
+          return result of underlying low-level command execution.
+          rtype: int
+          param terminal: same as terminal parameter described in `process` docstring before.
+          param addr: int, address of terminal in terminal network. This parameter defines which terminal will be the
                             target of this command.
           There may be other parameters here, depending on the nature of action.
           '''
@@ -135,8 +135,8 @@ class TerminalEntries(Structure):
         #if self.stp_paper_near:
         #    mainloop.notify.emit(_('Notification'), _('Paper near at terminal %i') % (self.addr,))
 
-        #if self.stp_paper_no:
-        #    mainloop.notify.emit(_('Notification'), _('No paper Paper near at terminal %i') % (self.addr,))
+        if self.stp_paper_no:
+            mainloop.notify.emit(_('Notification'), _('No paper at terminal %i') % (self.addr,))
 
         free_places_diff = self.out_count - self.in_count
         if free_places_diff:

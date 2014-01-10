@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from PyQt4 import uic
 from PyQt4.QtGui import QDialog
+from i18n import language
+_ = language.ugettext
 
 
 class LoginDialog(QDialog):
@@ -9,19 +11,28 @@ class LoginDialog(QDialog):
 
         self.ui = uic.loadUiType('login.ui')[0]()
         self.ui.setupUi(self)
+        self.localize()
+
         self.ui.progress.setVisible(False)
         self.ui.print_check.setVisible(False)
-        self.setWindowTitle(u'Начало смены')
-        self.ui.question.setText(u'Начать смену?')
-
         self.ui.info.setText(self.generate_info(card))
 
         self.ui.yes.clicked.connect(self.accept)
         self.ui.no.clicked.connect(self.reject)
 
+    def localize(self):
+        self.setWindowTitle(_('Session begin'))
+        self.ui.operatorGroup.setTitle(_('Operator'))
+        self.ui.question.setText(_('Begin session?'))
+        self.ui.yes.setText(_('Yes'))
+        self.ui.no.setText(_('No'))
+
     @staticmethod
     def generate_info(card):
-        return u'Карточка %s\n%s' % (card.sn, card.fio)
+        return _('Card %(sn)s\n%(fio)s\n') % {
+            'sn': card.sn,
+            'fio': card.fio
+        }
 
 
 class LogoffDialog(QDialog):
@@ -34,10 +45,9 @@ class LogoffDialog(QDialog):
 
         self.ui = uic.loadUiType('login.ui')[0]()
         self.ui.setupUi(self)
-        self.ui.print_check.setVisible(False)
-        self.setWindowTitle(u'Завершение смены')
-        self.ui.question.setText(u'Завершить смену?')
+        self.localize()
 
+        self.ui.print_check.setVisible(False)
         self.ui.info.setText(self.generate_info(card))
 
         self.ui.yes.clicked.connect(self.accept_logoff)
@@ -47,14 +57,26 @@ class LogoffDialog(QDialog):
         self.ui.print_check.clicked.connect(self.print_check)
         self.reader.generate_report()
 
+    def localize(self):
+        self.setWindowTitle(_('Session end'))
+        self.ui.operatorGroup.setTitle(_('Operator'))
+        self.ui.print_check.setText(_('Print temporary report'))
+        self.ui.question.setText(_('End session?'))
+        self.ui.yes.setText(_('Yes'))
+        self.ui.no.setText(_('No'))
+
     def accept_logoff(self):
         self.reader.to_printer(self.report.check(cashier=self.card.fio_short))
         self.accept()
 
     @staticmethod
     def generate_info(card, report=None):
-        report = unicode(report) if report else u'Отчет генерируется...'
-        return u'Карточка %s\n%s\n\n%s' % (card.sn, card.fio, report)
+        report = unicode(report) if report else _('Report generation...')
+        return _('Card %(sn)s\n%(fio)s\n\n%(report)s') % {
+            'sn': card.sn,
+            'fio': card.fio,
+            'report': report
+        }
 
     def print_check(self):
         self.reader.to_printer(self.report.check())

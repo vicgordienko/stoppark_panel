@@ -14,6 +14,8 @@ from db import DB, Ticket, Card
 from once_payable import OncePayable
 from report import Report
 from datetime import datetime
+from i18n import language
+_ = language.ugettext
 
 
 class TicketReader(object):
@@ -196,7 +198,7 @@ class Reader(QObject):
     def barcode_replace(match):
         bar = match.group('bar')
         result = ('\n\x1ba\x31\x1dw\x02\x1d\x68\x70\x1dk\x48'
-                  + chr(len(bar)) + bar*2 + '\n\x1ba\x30')
+                  + chr(len(bar)) + bar + bar + '\n\x1ba\x30')
         return result
 
     BARCODE_REPLACE_REGEX = re.compile(r'<<(?P<bar>\d+)>>')
@@ -279,6 +281,7 @@ class Payments(QWidget):
 
         self.ui = uic.loadUiType('payments.ui')[0]()
         self.ui.setupUi(self)
+        self.localize()
 
         self.ui.keyboard.clicked.connect(self.manual_ticket_input)
         self.ui.cancel.clicked.connect(self.cancel)
@@ -287,6 +290,7 @@ class Payments(QWidget):
         self.ui.tariffs.setSource(QUrl('view.qml'))
         self.ui.tariffs.setResizeMode(QDeclarativeView.SizeRootObjectToView)
         self.ui.tariffs.rootObject().new_payment.connect(self.handle_payment)
+        self.ui.tariffs.rootObject().set_message(_('Waiting for operator card...'))
 
         self.session_dialog.connect(self.handle_session_dialog)
 
@@ -296,6 +300,10 @@ class Payments(QWidget):
         self.reader.session_end.connect(self.end_session)
         self.end_session()
         self.reader.start()
+
+    def localize(self):
+        self.ui.pay.setText(_('Pay'))
+        self.ui.cancel.setText(_('Cancel'))
 
     def begin_session(self, sn, fio):
         print 'begin_session', sn

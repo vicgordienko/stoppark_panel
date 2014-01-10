@@ -16,15 +16,16 @@ class LocalDBMock(LocalDB):
         return self.query('select Payment, Type, Kassa, Operator, TalonID,'
                           'Status, TarifType, Tarif, TarifKol, DTIn, DTOut, Summa from payment')
 
-    def session(self):
+    def session(self, session_id=None):
         return '1234567890', self.operator, '2013-12-28 13:00', None
 
 
 class MockDB(DB):
+    #noinspection PyMissingConstructor
     def __init__(self, operator):
         self.local = LocalDBMock(operator)
 
-    def query(self, q, local):
+    def query(self, q, local=False):
         with self.local.connection() as c:
             c.execute(q)
 

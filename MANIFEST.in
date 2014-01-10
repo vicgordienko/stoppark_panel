@@ -1,4 +1,4 @@
 include *.txt
 recursive-include docs *.txt
-include stoppark/terminal.ui
+include stoppark/*.ui
 include stoppark/*.png

@@ -4,6 +4,9 @@ from datetime import datetime, date
 from tariff import Tariff
 from payment import Payment
 from config import DATETIME_FORMAT, DATE_FORMAT, DATE_USER_FORMAT
+from i18n import language
+_ = language.ugettext
+_n = language.ungettext
 
 
 class CardPayment(Payment):
@@ -30,20 +33,32 @@ class CardPayment(Payment):
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
-        base = u'Карточка %s\n%s.\n' \
-               u'Действительна от %s до %s\n' % (self.card.sn, self.card.fio,
-                                                 self.card.date_reg.strftime(DATE_USER_FORMAT),
-                                                 self.card.date_end.strftime(DATE_USER_FORMAT))
+        base = _('Card %(sn)s (%(status)s)\n'
+                 '%(fio)s.\n'
+                 'Valid from %(begin)s to %(end)s\n') % {
+                     'sn': self.card.sn,
+                     'status': {
+                         Card.INSIDE: _('inside'),
+                         Card.OUTSIDE: _('outside')
+                     }.get(self.card.status, _('unknown status')),
+                     'fio': self.card.fio,
+                     'begin':  self.card.date_reg.strftime(DATE_USER_FORMAT),
+                     'end': self.card.date_end.strftime(DATE_USER_FORMAT)
+                 }
+
         if self._enabled:
-            return base + unicode(self.result)
+            return u'%s%s\n%s' % (base, _('Refill for ') + self.tariff.interval_str(self.result.units, True),
+                                  self.result)
         else:
-            return base + u'Невозможно оплатить по этому тарифу.'
+            return base + _('Cannot be refilled by this tariff.')
 
     def vfcd_explanation(self):
         return [
-            u'%s - %s' % (self.result.begin.strftime(DATE_USER_FORMAT),
-                          self.result.end.strftime(DATE_USER_FORMAT)),
-            u'Оплата: %s грн.' % (self.price,)
+            _('%(begin)s - %(end)s') % {
+                'begin':  self.card.date_reg.strftime(DATE_USER_FORMAT),
+                'end': self.card.date_end.strftime(DATE_USER_FORMAT)
+            },
+            _('Price: $%i') % (self.price,)
         ]
 
     @property
@@ -72,20 +87,26 @@ class CardPayment(Payment):
         return db.generate_payment(self.db_payment_args)
 
     def check(self, db):
-        interval = {Tariff.HOURLY: u'год.', Tariff.DAILY: u'доб.', Tariff.MONTHLY: u'міс.'}[self.tariff.interval]
+        args = {
+            'sn': self.card.sn,
+            'tariff': self.tariff.title,
+            'cost_info': self.tariff.cost_info_check,
+            'begin': self.card.date_reg.strftime(DATE_USER_FORMAT),
+            'end': self.card.date_end.strftime(DATE_USER_FORMAT),
+            'refill': _('_Refill for ') + self.tariff.interval_str_check(self.result.units, True),
+            'new_begin': self.result.begin.strftime(DATE_USER_FORMAT),
+            'new_end': self.result.end.strftime(DATE_USER_FORMAT),
+            'price': self.price
+        }
 
-        return Payment.check(self, db) + u'\n'.join([
-            u'Картка %s' % (self.card.sn,),
-            u'%s: %s грн./%s' % (self.tariff.title, self.tariff.costInfo, interval),
-            u'До поповнення: з %s по %s' % (self.card.date_reg.strftime(DATE_USER_FORMAT),
-                                            self.card.date_end.strftime(DATE_USER_FORMAT)),
-            u'Поповнення на %i %s' % (self.result.units, interval),
-            u'<hr />',
-            u'Після поповнення: з %s по %s' % (self.result.begin.strftime(DATE_USER_FORMAT),
-                                               self.result.end.strftime(DATE_USER_FORMAT)),
-            u'Вартість: %s грн.' % (self.price,),
-            u'<hr />'
-        ])
+        return Payment.check(self, db) + _('Card %(sn)s\n'
+                                           '%(tariff)s: %(cost_info)s\n'
+                                           'Before refill: from %(begin)s to %(end)s\n'
+                                           '%(refill)s\n'
+                                           'After refill: from %(new_begin)s to %(new_end)s\n'
+                                           '<hr />\n'
+                                           'Price: %(price)s\n'
+                                           '<hr />') % args
 
 
 class CardPaymentUnsupported(Payment):
@@ -95,7 +116,10 @@ class CardPaymentUnsupported(Payment):
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
-        return u'Карточка %s\n%s.\nНевозможно оплатить по этому тарифу.' % (self.card.sn, self.card.fio)
+        return _('Card %(sn)s\n'
+                 '%(fio)s\n') % {
+                     'sn': self.card.sn, 'fio': self.card.fio
+                 } + _('Cannot be refilled by this tariff.')
 
 
 class Card(QObject):

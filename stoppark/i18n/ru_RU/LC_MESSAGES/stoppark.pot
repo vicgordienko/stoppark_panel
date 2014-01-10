@@ -7,54 +7,615 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Stoppark-1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2013-10-24 13:38+0000\n"
-"PO-Revision-Date: 2013-10-24 13:42+0200\n"
+"POT-Creation-Date: 2014-01-10 16:20+0200\n"
+"PO-Revision-Date: 2014-01-10 16:21+0200\n"
 "Last-Translator: Feanor <std.feanor@gmail.com>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language-Team: stdk <http://github.com/stdk>\n"
 "Language: ru_RU\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 1.5.7\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 "X-Poedit-SourceCharset: UTF-8\n"
 "X-Poedit-Basepath: s:\\a13\\stoppark\\stoppark\\\n"
+"X-Poedit-KeywordsList: _\n"
+"X-Generator: Poedit 1.5.7\n"
 
-#: interface.py:140
-msgid "Card at terminal"
-msgstr "Поднесение карточки к терминалу"
+#: card.py:36
+#, python-format
+msgid ""
+"Card %(sn)s (%(status)s)\n"
+"%(fio)s.\n"
+"Valid from %(begin)s to %(end)s\n"
+msgstr ""
+"Карточка %(sn)s (%(status)s)\n"
+"%(fio)s.\n"
+"Действительна с %(begin)s по %(end)s\n"
 
-#: interface.py:142
-msgid "Access permitted"
-msgstr "Доступ разрешен"
+#: card.py:41
+msgid "inside"
+msgstr "внутри"
 
-#: interface.py:144
-msgid "Access permitted."
-msgstr "Доступ разрешен."
+#: card.py:42
+msgid "outside"
+msgstr "снаружи"
 
-#: interface.py:146
-msgid "Access denied"
-msgstr "Доступ разрешен"
+#: card.py:43
+msgid "unknown status"
+msgstr "неизвестно"
 
-#: interface.py:147
-msgid "Access denied."
-msgstr "Доступ запрещен."
+#: card.py:50
+msgid "Refill for "
+msgstr "Пополнение на "
 
-#: interface.py:150
-msgid "Car inside"
-msgstr "Вьезд"
+#: card.py:53 card.py:122
+msgid "Cannot be refilled by this tariff."
+msgstr "Невозможно пополнить по этому тарифу."
 
-#: interface.py:154
-msgid "Car outside"
-msgstr "Выезд"
+#: card.py:57
+#, python-format
+msgid "%(begin)s - %(end)s"
+msgstr "%(begin)s - %(end)s"
 
-#: gui.py:40
+#: card.py:61 once_payable.py:32 payment.py:60
+#, python-format
+msgid "Price: $%i"
+msgstr "Оплата: %i грн."
+
+#: card.py:96
+msgid "_Refill for "
+msgstr "Поповнення на "
+
+# Формат чека при оплате карточки
+#: card.py:102
+#, python-format
+msgid ""
+"Card %(sn)s\n"
+"%(tariff)s: %(cost_info)s\n"
+"Before refill: from %(begin)s to %(end)s\n"
+"%(refill)s\n"
+"After refill: from %(new_begin)s to %(new_end)s\n"
+"<hr />\n"
+"Price: %(price)s\n"
+"<hr />"
+msgstr ""
+"Картка %(sn)s\n"
+"%(tariff)s: %(cost_info)s\n"
+"До поповнення: з %(begin)s по %(end)s\n"
+"%(refill)s\n"
+"Після поповнення: з %(new_begin)s по %(new_end)s\n"
+"<hr />\n"
+"Вартість: %(price)s грн.\n"
+"<hr />"
+
+#: card.py:119 login.py:32
+#, python-format
+msgid ""
+"Card %(sn)s\n"
+"%(fio)s\n"
+msgstr ""
+"Карточка %(sn)s\n"
+"%(fio)s\n"
+
+#: config_ui.py:31 gui.py:42
 msgid "Terminals"
 msgstr "Терминалы"
 
-#: gui.py:41
+#: config_ui.py:32 gui.py:43
 msgid "Payments"
 msgstr "Оплата"
 
-#: gui.py:42
+#: config_ui.py:33
+msgid "Terminal list"
+msgstr "Список терминалов"
+
+#: config_ui.py:34
+msgid "Configure and update terminal list:"
+msgstr "Выполнить настройку и обновление списка терминалов:"
+
+#: config_ui.py:35
+msgid "Configure"
+msgstr "Настроить"
+
+#: config_ui.py:36
+msgid "Update"
+msgstr "Обновить"
+
+#: config_ui.py:37
+msgid "Terminal setup"
+msgstr "Конфигурация терминалов"
+
+#: config_ui.py:38
+msgid "Perform global terminal setup:"
+msgstr "Выполнить установку параметров для всех терминалов в системе:"
+
+#: config_ui.py:39
+msgid "Setup"
+msgstr "Установить"
+
+#: config_ui.py:40
+msgid "Tests"
+msgstr "Тесты"
+
+#: config_ui.py:41
+msgid "Display test:"
+msgstr "Выполнить тест дисплея:"
+
+#: config_ui.py:42
+msgid "Test display"
+msgstr "Тест дисплея"
+
+#: config_ui.py:67
+msgid "successful"
+msgstr "успешно"
+
+#: config_ui.py:67
+msgid "unsuccessful"
+msgstr "не удалось"
+
+#: config_ui.py:69
+#, python-format
+msgid "Update: %(message)s (%(now)s)"
+msgstr "Обновление: %(message)s (%(now)s)"
+
+#: db.py:211
+msgid "Database Error"
+msgstr "Нет связи с базой данных"
+
+#: db.py:216
+msgid "Query Error"
+msgstr "Ошибка запроса к базе данных"
+
+#: db.py:297
+msgid ""
+"Automatic system\n"
+"of payed parking\n"
+"STOP-Park\n"
+"<hr />\n"
+msgstr ""
+"Автоматизована система\n"
+"платного паркування\n"
+"STOP-Park\n"
+"<hr />\n"
+
+#: gui.py:41
+msgid "Stop-Park"
+msgstr ""
+
+#: gui.py:44
 msgid "Config"
 msgstr "Настройки"
+
+#: interface.py:139
+msgid "Notification"
+msgstr "Уведомление"
+
+#: interface.py:139
+#, python-format
+msgid "No paper at terminal %i"
+msgstr "Нет бумаги на терминале %i"
+
+#: interface.py:222
+msgid "Card at terminal"
+msgstr "Поднесение карточки к терминалу"
+
+#: interface.py:224 interface.py:226
+msgid "Access permitted."
+msgstr "Доступ разрешен."
+
+#: interface.py:228 interface.py:229
+msgid "Access denied."
+msgstr "Доступ запрещен."
+
+#: interface.py:232
+msgid "Car inside"
+msgstr "Въезд по карточке"
+
+#: interface.py:236
+msgid "Car outside"
+msgstr "Выезд по карточке"
+
+#: interface.py:294 interface.py:296
+msgid "BAR Access permitted."
+msgstr "Доступ разрешен."
+
+#: interface.py:298 interface.py:299
+msgid "BAR Access denied."
+msgstr "Доступ запрещен."
+
+#: interface.py:304
+msgid "BAR Left"
+msgstr "Выезд по талону"
+
+#: keyboard.py:47
+msgid "Manual barcode input"
+msgstr "Ручной ввод баркода"
+
+#: keyboard.py:48
+msgid "Input barcode"
+msgstr "Введите баркод"
+
+#: keyboard.py:49 terminal_config.py:144
+msgid "OK"
+msgstr "ОК"
+
+#: keyboard.py:50 payments.py:306 terminal_config.py:145
+msgid "Cancel"
+msgstr "Отмена"
+
+#: login.py:24
+msgid "Session begin"
+msgstr "Начало смены"
+
+#: login.py:25 login.py:62
+msgid "Operator"
+msgstr "Оператор"
+
+#: login.py:26
+msgid "Begin session?"
+msgstr "Начать смену?"
+
+#: login.py:27 login.py:65
+msgid "Yes"
+msgstr "Да"
+
+#: login.py:28 login.py:66
+msgid "No"
+msgstr "Нет"
+
+#: login.py:61
+msgid "Session end"
+msgstr "Завершение смены"
+
+#: login.py:63
+msgid "Print temporary report"
+msgstr "Печать временного отчёта"
+
+#: login.py:64
+msgid "End session?"
+msgstr "Завершить смену?"
+
+#: login.py:74
+msgid "Report generation..."
+msgstr "Генерация отчёта..."
+
+#: login.py:75
+#, python-format
+msgid ""
+"Card %(sn)s\n"
+"%(fio)s\n"
+"\n"
+"%(report)s"
+msgstr ""
+"Карточка %(sn)s\n"
+"%(fio)s\n"
+"\n"
+"%(report)s"
+
+#: once_payable.py:27 once_payable.py:31
+msgid "Single payment"
+msgstr "Разовая оплата"
+
+# Формат чека для разовой оплаты
+#: once_payable.py:52
+#, python-format
+msgid ""
+"date: %(now)s\n"
+"%(tariff)s: $%(price)s\n"
+"<hr />"
+msgstr ""
+"дата друку: %(now)s\n"
+"%(tariff)s: %(price)s грн.\n"
+"<hr />"
+
+#: payment.py:94
+msgid ""
+"<c><b>P A R K I N G  T I C K E T</b></c>\n"
+"\n"
+msgstr ""
+"<c><b>П А Р К У В А Л Ь Н И Й  Т А Л О Н</b></c>\n"
+"\n"
+
+#: payments.py:293
+msgid "Waiting for operator card..."
+msgstr "Поднесите карточку оператора"
+
+#: payments.py:305
+msgid "Pay"
+msgstr "Оплатить"
+
+# Формат отчета в интерфейсе пользователя
+#: report.py:37
+msgid ""
+"Cash: ${self.sum}\n"
+"Moved inside: %{self.moved_in}\n"
+"Moved outside: %{self.moved_out}\n"
+"Moved outside using card: %{self.card_moved_out}\n"
+msgstr ""
+"Сумма в кассе: {self.sum} грн.\n"
+"Въехало: {self.moved_in}\n"
+"Выехало всего: {self.moved_out}\n"
+"Выехало по карточкам: {self.card_moved_out}\n"
+
+# Футер для чека закрывающего смену
+#: report.py:52
+#, python-format
+msgid ""
+"Session completed by: %s\n"
+"<c>***SESSION COMPLETED***</c>"
+msgstr ""
+"Зміну здав: %s\n"
+"<c>***ЗМІНУ ЗАВЕРШЕНО***</c>"
+
+# Футер для чека временного отчёта
+#: report.py:54
+msgid "<c>TEMPORARY REPORT</c>"
+msgstr "<c>ТИМЧАСОВИЙ ЗВІТ</c>"
+
+# Формат чека для отчётов без хедера и футера
+#: report.py:57
+msgid ""
+"<c><s>Report on period</s></c>\n"
+"\n"
+"from {self.begin}\n"
+"to {now}\n"
+"all places: {self.total_places}\n"
+"      free: {self.free_places}\n"
+"        in: {self.moved_in}\n"
+"       out: {self.moved_out}\n"
+"   tickets: {self.ticket_moved_out}\n"
+"     cards: {self.card_moved_out}\n"
+"\n"
+"       Sum: {self.sum}\n"
+"\n"
+msgstr ""
+"<c><s>Звіт за період</s></c>\n"
+"\n"
+"з {self.begin}\n"
+"по {now}\n"
+"паркомісць разом: {self.total_places}\n"
+"         вільних: {self.free_places}\n"
+"         вїздів: {self.moved_in}\n"
+"         виїздів: {self.moved_out}\n"
+"         разових: {self.ticket_moved_out}\n"
+"       постійних: {self.card_moved_out}\n"
+"\n"
+"     Сума в касі: {self.sum} грн.\n"
+"\n"
+
+#: tariff.py:136
+msgid "unit_"
+msgid_plural "units_"
+msgstr[0] "раз"
+msgstr[1] "рази"
+msgstr[2] "разів"
+
+#: tariff.py:137 tariff.py:228 ticket.py:35
+msgid "hour_"
+msgid_plural "hours_"
+msgstr[0] "година"
+msgstr[1] "години"
+msgstr[2] "годин"
+
+#: tariff.py:138 tariff.py:227 ticket.py:36
+msgid "day_"
+msgid_plural "days_"
+msgstr[0] "доба"
+msgstr[1] "доби"
+msgstr[2] "діб"
+
+#: tariff.py:139 ticket.py:37
+msgid "month_"
+msgid_plural "months_"
+msgstr[0] "місяць"
+msgstr[1] "місяці"
+msgstr[2] "місяців"
+
+#: tariff.py:155
+msgid "unit"
+msgid_plural "units"
+msgstr[0] "раз"
+msgstr[1] "раза"
+msgstr[2] "раз"
+
+#: tariff.py:156 tariff.py:234
+msgid "hour"
+msgid_plural "hours"
+msgstr[0] "час"
+msgstr[1] "часа"
+msgstr[2] "часов"
+
+#: tariff.py:157 tariff.py:233
+msgid "day"
+msgid_plural "days"
+msgstr[0] "день"
+msgstr[1] "дня"
+msgstr[2] "дней"
+
+#: tariff.py:158
+msgid "month"
+msgid_plural "months"
+msgstr[0] "месяц"
+msgstr[1] "месяца"
+msgstr[2] "месяцев"
+
+#: tariff.py:177 tariff.py:184 tariff.py:191
+#, python-format
+msgid "$%(cost)s/%(interval)s"
+msgstr "%(cost)s грн./%(interval)s"
+
+#: tariff.py:203
+msgid "Zero time: "
+msgstr "Расчетное время: "
+
+#: tariff.py:209
+#, python-format
+msgid "Max per day: $%i"
+msgstr "Максимум за день: %i грн."
+
+#: tariff.py:229
+msgid "minute_"
+msgid_plural "minutes_"
+msgstr[0] "хвилина"
+msgstr[1] "хвилини"
+msgstr[2] "хвилин"
+
+#: tariff.py:235
+msgid "minute"
+msgid_plural "minutes"
+msgstr[0] "минута"
+msgstr[1] "минуты"
+msgstr[2] "минут"
+
+#: tariff.py:238
+#, python-format
+msgid ""
+"Duration: %(duration)s.\n"
+"Payment units: %(units)i"
+msgstr ""
+"Длительность парковки: %(duration)s.\n"
+"Единиц оплаты: %(units)i"
+
+#: tariff.py:465
+#, python-format
+msgid "After refill: from %(begin)s to %(end)s"
+msgstr "После пополнения: с %(begin)s по %(end)s"
+
+#: terminal_config.py:52
+msgid "Addr"
+msgstr "Адрес"
+
+#: terminal_config.py:52
+msgid "Title"
+msgstr "Наименование"
+
+#: terminal_config.py:143
+msgid "Terminal config"
+msgstr "Настройка терминалов"
+
+#: ticket.py:68 ticket.py:134 ticket.py:191
+#, python-format
+msgid ""
+"Ticket %s.\n"
+"Not payable with this tariff."
+msgstr ""
+"Талон %s.\n"
+"Невозможно оплатить по этому тарифу"
+
+#: ticket.py:70
+#, python-format
+msgid ""
+"Payment for ticket %(bar)s.\n"
+"Time in: %(time_in)s.\n"
+"%(details)s"
+msgstr ""
+"Оплата по талону %(bar)s.\n"
+"Время въезда: %(time_in)s.\n"
+"%(details)s"
+
+# Формат чека для оплаты по талону
+#: ticket.py:107
+#, python-format
+msgid ""
+"  entry time: %(time_in)s\n"
+"payment time: %(now)s\n"
+"      tariff: %(cost_info)s\n"
+"parking duration: %(duration)s\n"
+"  paid until: %(paid_until)s\n"
+"<hr />\n"
+"Price: $%(price)s\n"
+"<hr />\n"
+"<<%(bar)s>>"
+msgstr ""
+" в'їзд: %(time_in)s\n"
+"оплата: %(now)s\n"
+" тариф: %(cost_info)s\n"
+"тривалість: %(duration)s\n"
+"оплачено до: %(paid_until)s\n"
+"<hr />\n"
+"Вартість: %(price)s грн.\n"
+"<hr />\n"
+"<<%(bar)s>>"
+
+#: ticket.py:136
+#, python-format
+msgid ""
+"Extra payment for ticket: %(bar)s.\n"
+"Time in: %(time_in)s.\n"
+"Last payment: %(base_time)s.\n"
+"%(details)s"
+msgstr ""
+"Доплата по талону %(bar)s.\n"
+"Время въезда: %(time_in)s\n"
+"Последняя оплата: %(base_time)s.\n"
+"%(details)s"
+
+#: ticket.py:149
+#, python-format
+msgid "Surcharge: $%i"
+msgstr "Доплата: %i грн."
+
+# Формат чека для доплаты по талону
+#: ticket.py:173
+#, python-format
+msgid ""
+"last payment: %(base_time)s\n"
+"   surcharge: %(now)s\n"
+"      tariff: %(cost_info)s\n"
+"parking duration: %(duration)s\n"
+"  paid until: %(paid_until)s\n"
+"<hr />\n"
+"Price: $%(price)s\n"
+"<hr />\n"
+"<<%(bar)s>>"
+msgstr ""
+"остання оплата: %(base_time)s\n"
+"       доплата: %(now)s\n"
+"тариф: %(cost_info)s\n"
+"тривалість: %(duration)s\n"
+"оплачено до: %(paid_until)s\n"
+"<hr />\n"
+"Вартість: %(price)s грн.\n"
+"<hr />\n"
+"<<%(bar)s>>"
+
+#: ticket.py:202
+#, python-format
+msgid "Ticket %s already paid."
+msgstr "Талон %s уже оплачен."
+
+#: ticket.py:212
+#, python-format
+msgid "Ticket %s already out."
+msgstr "Талон уже %s выехал."
+
+#: ticket.py:222
+#, python-format
+msgid "Ticket %s payment undefined."
+msgstr "Оплата по талону %s не определена."
+
+#~ msgid ""
+#~ "Card %(sn)s\n"
+#~ "%(fio)s"
+#~ msgstr ""
+#~ "Карточка %(sn)s\n"
+#~ "%(fio)s"
+
+#~ msgid "once"
+#~ msgstr "за раз"
+
+#~ msgid "Refill for %i days."
+#~ msgstr "Пополнение на %i дней."
+
+#~ msgid "Cost: $%i"
+#~ msgstr "Оплата: %i грн."
+
+#~ msgid "Extra cost: $%i"
+#~ msgstr "Доплата: %i грн."
+
+#~ msgid "Access permitted"
+#~ msgstr "Доступ разрешен"
+
+#~ msgid "Access denied"
+#~ msgstr "Доступ разрешен"

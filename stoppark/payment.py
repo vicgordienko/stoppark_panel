@@ -1,5 +1,7 @@
 # coding=utf-8
 from PyQt4.QtCore import QObject, pyqtProperty
+from i18n import language
+_ = language.ugettext
 
 
 class Payment(QObject):
@@ -51,6 +53,13 @@ class Payment(QObject):
         return 0
 
     @pyqtProperty(str, constant=True)
+    def price_info(self):
+        """
+        This property returns text information about payment price.
+        """
+        return _('Price: $%i') % (self.price,)
+
+    @pyqtProperty(str, constant=True)
     def explanation(self):
         """
         This property holds a text explanation for its payment, according to its internal logic.
@@ -82,4 +91,4 @@ class Payment(QObject):
         @param db: db.DB, database instance to be used in check generation.
         @return: unicode
         """
-        return db.get_check_header() + u'<c><b>П А Р К У В А Л Ь Н И Й  Т А Л О Н</b></c>\n\n'
+        return db.get_check_header() + _('<c><b>P A R K I N G  T I C K E T</b></c>\n\n')

@@ -11,7 +11,10 @@ class SafeSocket(object):
     def reconnect(self):
         if self.sock is not None:
             self.sock.close()
-        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        if hasattr(socket, 'AF_UNIX') and hasattr(socket, 'SOCK_STREAM'):
+            self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        else:
+            return False
         while True:
             print 'trying to connect to', self.peer
             try:

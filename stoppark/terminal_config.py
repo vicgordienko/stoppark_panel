@@ -5,12 +5,15 @@ from PyQt4.QtGui import QDialog, QFont, QHeaderView, QStyledItemDelegate
 from PyQt4.QtGui import QApplication, QStyle, QStyleOptionViewItem, QColor
 from PyQt4.QtSql import QSqlTableModel, QSqlDatabase
 from config import db_filename
+from i18n import language
+_ = language.ugettext
 
 
 #noinspection PyCallByClass,PyTypeChecker
 QDB = QSqlDatabase.addDatabase("QSQLITE")
 QDB.setDatabaseName(db_filename)
 QDB.open()
+
 
 class CenteredCheckBoxDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):
@@ -46,8 +49,7 @@ class CenteredCheckBoxDelegate(QStyledItemDelegate):
 class TerminalSqlTableModel(QSqlTableModel):
     def __init__(self, parent=None, db=None):
         QSqlTableModel.__init__(self, parent, db)
-        self.headers = [u'Адрес', u'Наименование', u'', u'']
-
+        self.headers = [_('Addr'), _('Title'), u'', u'']
         self.font = QFont("Monospace", 18)
 
     #noinspection PyPep8Naming,PyMethodOverriding
@@ -118,6 +120,7 @@ class TerminalConfig(QDialog):
 
         self.ui = uic.loadUiType('terminal-config.ui')[0]()
         self.ui.setupUi(self)
+        self.localize()
 
         self.model = TerminalSqlTableModel(self, QDB)
         self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
@@ -135,6 +138,11 @@ class TerminalConfig(QDialog):
         self.ui.cancel.clicked.connect(self.cancel)
         self.ui.set_left.clicked.connect(self.set_left)
         self.ui.set_right.clicked.connect(self.set_right)
+
+    def localize(self):
+        self.setWindowTitle(_('Terminal config'))
+        self.ui.ok.setText(_('OK'))
+        self.ui.cancel.setText(_('Cancel'))
 
     def set_left(self):
         selected_indexes = self.ui.terminals.selectedIndexes()

@@ -6,6 +6,12 @@ Rectangle {
     width: 700
     height: 300
 
+    property string message
+
+    function set_message(new_message) {
+        message = new_message
+    }
+
     property variant payable
     signal new_payment (variant payment)
 
@@ -64,7 +70,8 @@ Rectangle {
 
         opacity: list.model.count ? 0 : 1
 
-        text: "Поднесите карточку оператора"
+        //text: "Поднесите карточку оператора"
+        text: message
         font.pointSize: 25
     }
 
@@ -164,7 +171,7 @@ Rectangle {
                 anchors.top: parent.top
                 anchors.topMargin: 10
 
-                text: tariff.costInfo + ' грн. / ' + tariff.intervalStr
+                text: tariff.cost_info
                 font.pointSize: 12
             }
 
@@ -174,7 +181,7 @@ Rectangle {
                 anchors.rightMargin: 10
                 anchors.top: priceInfo.bottom
 
-                text: tariff.zeroTime != '' ? 'Расчетное время: ' + tariff.zeroTime : ''
+                text: tariff.zero_time_info
                 font.pointSize: 12
             }
 
@@ -183,7 +190,7 @@ Rectangle {
                 anchors.rightMargin: 10
                 anchors.top: zeroTime.bottom
 
-                text: tariff.maxPerDay != -1 ? 'Максимум за сутки: ' + tariff.maxPerDay + ' грн.' : ''
+                text: tariff.max_per_day_info
                 font.pointSize: 12
             }
 
@@ -201,7 +208,7 @@ Rectangle {
             Text {
                 id: price
                 opacity: detailsOpacity
-                text: payment && payment.enabled ? 'К оплате: ' + payment.price + ' грн.': ''
+                text: payment && payment.enabled ? payment.price_info : ''
                 font.pointSize: 20
                 anchors.right: parent.right
                 anchors.rightMargin: 20

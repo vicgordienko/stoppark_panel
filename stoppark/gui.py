@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from PyQt4 import uic
-from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QWidget, QApplication
 from db import LocalDB
 from i18n import language
@@ -13,7 +12,6 @@ class Main(QWidget):
 
         self.ui = uic.loadUiType('main.ui')[0]()
         self.ui.setupUi(self)
-
         self.localize()
 
         self.ui.config.setup(self.ui.terminals, self.ui.payments)
@@ -39,6 +37,12 @@ class Main(QWidget):
         self.end_session()
         #self.setWindowFlags(Qt.CustomizeWindowHint)
 
+    def localize(self):
+        self.setWindowTitle(_('Stop-Park'))
+        self.ui.tabs.setTabText(0, _('Terminals'))
+        self.ui.tabs.setTabText(1, _('Payments'))
+        self.ui.tabs.setTabText(2, _('Config'))
+
     def enable_buttons(self):
         self.left_terminals = self.db.get_terminals_id_by_option('left')
         self.ui.leftUp.setEnabled(not not self.left_terminals)
@@ -61,11 +65,6 @@ class Main(QWidget):
         [self.ui.tabs.setTabEnabled(i, False) for i in [0, 2]]
         self.disable_buttons()
         self.ui.terminals.end_session()
-
-    def localize(self):
-        self.ui.tabs.setTabText(0, _('Terminals'))
-        self.ui.tabs.setTabText(1, _('Payments'))
-        self.ui.tabs.setTabText(2, _('Config'))
 
     def left_up(self):
         for addr in self.left_terminals:

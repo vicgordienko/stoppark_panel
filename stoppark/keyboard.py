@@ -2,6 +2,8 @@ from subprocess import Popen
 from PyQt4 import uic
 from PyQt4.QtGui import QLineEdit, QDialog
 from db import Ticket
+from i18n import language
+_ = language.ugettext
 
 
 class Keyboard(object):
@@ -21,6 +23,7 @@ class TouchLineEdit(QLineEdit):
     def __init__(self, *args):
         QLineEdit.__init__(self, *args)
 
+    #noinspection PyPep8Naming
     def focusInEvent(self, e):
         Keyboard.show()
 
@@ -38,6 +41,13 @@ class TicketInput(QDialog):
         self.ui.bar.textChanged.connect(self.bar_changed)
 
         self.show_keyboard()
+        self.ui.bar.setFocus(True)
+
+    def localize(self):
+        self.setWindowTitle(_('Manual barcode input'))
+        self.ui.bar.setPlaceholderText(_('Input barcode'))
+        self.ui.ok.setText(_('OK'))
+        self.ui.cancel.setText(_('Cancel'))
 
     @staticmethod
     def show_keyboard():

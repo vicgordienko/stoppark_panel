@@ -294,13 +294,10 @@ class DB(QObject):
         return self._strings[1]
 
     def get_check_header(self):
-        return u'<c>' + u'\n'.join([
-            u'<hr />',
-            u'Автоматизизована система',
-            u'платного паркування',
-            u'"STOP-Park"',
-            u'<hr />'
-        ] + self.get_config_strings()[:4]) + u'\n<hr /></c>\n'
+        return u'<c><hr />\n' + _('Automatic system\n'
+                                  'of payed parking\n'
+                                  'STOP-Park\n'
+                                  '<hr />\n') + u'\n'.join(self.get_config_strings()[:4]) + u'\n<hr /></c>\n'
 
     PAYMENT_QUERY = 'insert into payment values(NULL, "{payment}", {tariff}, {console}, "{operator}", ' \
                     ' "{now}", "{id}", {status}, {tariff}, {cost}*100, {units}, "{begin}", "{end}", {price}*100)'
@@ -308,7 +305,7 @@ class DB(QObject):
     def generate_payment(self, db_payment_args):
         session = self.local.session()
         operator = session[1] if session is not None else '?'
-        now = datetime.now().strftime(DATETIME_FORMAT_FULL)
+        now = datetime.now().strftime(DATETIME_FORMAT)
 
         return self.query(self.PAYMENT_QUERY.format(console=0, operator=operator, status=Ticket.PAID,
                                                     now=now, **db_payment_args), local=True) is None

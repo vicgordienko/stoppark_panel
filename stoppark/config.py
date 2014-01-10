@@ -30,7 +30,7 @@ DATE_FORMAT = '%y-%m-%d'
 DATE_USER_FORMAT = '%d/%m/%y'
 DATETIME_FORMAT = '%y-%m-%d %H:%M:%S'
 DATETIME_FORMAT_FULL = '%Y-%m-%d %H:%M:%S'
-DATETIME_USER_FORMAT = '%d/%m/%y %H:%M:%S'
+DATETIME_FORMAT_USER = '%d/%m/%y %H:%M:%S'
 
 
 def setup_logging(handler=None):

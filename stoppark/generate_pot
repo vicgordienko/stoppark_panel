@@ -1,1 +1,1 @@
-xgettext --language=Python --keyword=_ --output=stoppark.pot --from-code=UTF-8 `find -name "*.py"`
+/c/Program\ Files/Poedit/bin/xgettext --language=Python --keyword=_n:1,2 --output=stoppark.pot --from-code=UTF-8 `find -name "*.py"`

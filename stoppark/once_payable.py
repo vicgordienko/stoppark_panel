@@ -3,7 +3,10 @@ from PyQt4.QtCore import QObject, pyqtSlot, pyqtProperty
 from tariff import Tariff
 from payment import Payment
 from datetime import datetime
-from config import DATETIME_USER_FORMAT
+from config import DATETIME_FORMAT_USER
+from i18n import language
+_ = language.ugettext
+_n = language.ungettext
 
 
 class OncePayment(Payment):
@@ -21,12 +24,12 @@ class OncePayment(Payment):
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
-        return u'Разовая оплата'
+        return _('Single payment')
 
     def vfcd_explanation(self):
         return [
-            u'Разовая оплата',
-            u'К оплате: %i грн.' % (self.price,)
+            _('Single payment'),
+            _('Price: $%i') % (self.price,)
         ]
 
     @property
@@ -46,11 +49,13 @@ class OncePayment(Payment):
         return db.generate_payment(self.db_payment_args)
 
     def check(self, db):
-        return Payment.check(self, db) + u'\n'.join([
-            u'дата друку: %s' % (datetime.now().strftime(DATETIME_USER_FORMAT)),
-            u'%s: %s грн.' % (self.tariff.title, self.price),
-            u'<hr />',
-        ])
+        return Payment.check(self, db) + _('date: %(now)s\n'
+                                           '%(tariff)s: $%(price)s\n'
+                                           '<hr />') % {
+                                               'now': datetime.now().strftime(DATETIME_FORMAT_USER),
+                                               'tariff': self.tariff.title,
+                                               'price': self.price
+                                           }
 
 
 class OncePaymentUnsupported(Payment):

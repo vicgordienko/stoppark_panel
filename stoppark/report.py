@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
-from config import DATETIME_USER_FORMAT, LOCAL_DATETIME_FORMAT
+from config import DATETIME_FORMAT_USER, LOCAL_DATETIME_FORMAT
+from i18n import language
+_ = language.ugettext
 
 
 class Report(object):
@@ -12,7 +14,7 @@ class Report(object):
         if session is not None:
             _, _, self.begin, _ = session
             try:
-                self.begin = datetime.strptime(self.begin, LOCAL_DATETIME_FORMAT).strftime(DATETIME_USER_FORMAT)
+                self.begin = datetime.strptime(self.begin, LOCAL_DATETIME_FORMAT).strftime(DATETIME_FORMAT_USER)
             except ValueError:
                 pass
 
@@ -29,16 +31,13 @@ class Report(object):
         self.card_moved_out = db.local.query('select count(*) from events '
                                              'where Direction="наружу" and EventName="проезд"'
                                              'and Card is not null')[0][0]
-        #self.ticket_moved_out = db.local.query('select count(*) from events '
-        #                                       'where Direction="наружу" and EventName="проезд'
-        #                                       'and Card is not null"')[0][0]
+        self.ticket_moved_out = self.moved_out - self.card_moved_out
 
     def __unicode__(self):
-        return u'Сумма в кассе: %i грн.\n' \
-               u'Въехало: %i\n' \
-               u'Выехало всего: %i\n' \
-               u'Выехало по карточкам: %i\n' % (self.sum, self.moved_in,
-                                                self.moved_out, self.card_moved_out)
+        return _('Cash: ${self.sum}\n'
+                 'Moved inside: %{self.moved_in}\n'
+                 'Moved outside: %{self.moved_out}\n'
+                 'Moved outside using card: %{self.card_moved_out}\n').format(self=self)
 
     def check(self, cashier=None):
         """
@@ -50,26 +49,25 @@ class Report(object):
         u...
         """
         if cashier is not None:
-            footer = u'Зміну здав: %s\n<c>***ЗМІНУ ЗАВЕРШЕНО***</c>' % (cashier,)
+            footer = _('Session completed by: %s\n<c>***SESSION COMPLETED***</c>') % (cashier,)
         else:
-            footer = u'<c>***ТИМЧАСОВИЙ ЗВІТ***</c>'
+            footer = _('<c>TEMPORARY REPORT</c>')
 
-        return u'\n'.join([
-            self.header + u'<c><s>Звіт за період</s></c>\n',
-            u'з  %s' % (self.begin,),
-            u'по %s' % (datetime.now().strftime(DATETIME_USER_FORMAT),),
-            u'паркомісць разом: %i' % (self.total_places,),
-            u'         вільних: %i' % (self.free_places,),
-            u'         в\'їздів: %i' % (self.moved_in,),
-            u'         виїздів: %i' % (self.moved_out,),
-            u'         разових: %i' % (self.moved_out - self.card_moved_out,),
-            u'       постійних: %i' % (self.card_moved_out,),
-            u'',
-            u'     Сума в касі: %i грн.' % (self.sum,),
-            u'',
-            footer,
-            u'<hr />'
-        ])
+        return (self.header +
+                _('<c><s>Report on period</s></c>\n'
+                 '\n'
+                 'from {self.begin}\n'
+                 'to {now}\n'
+                 'all places: {self.total_places}\n'
+                 '      free: {self.free_places}\n'
+                 '        in: {self.moved_in}\n'
+                 '       out: {self.moved_out}\n'
+                 '   tickets: {self.ticket_moved_out}\n'
+                 '     cards: {self.card_moved_out}\n'
+                 '\n'
+                 '       Sum: {self.sum}\n'
+                 '\n').format(self=self, now=datetime.now().strftime(DATETIME_FORMAT_USER)) +
+                footer + u'\n<hr />')
 
 
 if __name__ == '__main__':

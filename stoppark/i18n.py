@@ -2,7 +2,6 @@
 
 import gettext
 
-# Change this variable to your app name!
 #  The translation files will be under
 #  @LOCALE_DIR@/@LANGUAGE@/LC_MESSAGES/@APP_NAME@.mo
 APP_NAME = "stoppark"
