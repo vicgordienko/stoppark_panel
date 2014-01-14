@@ -15,39 +15,41 @@ Rectangle {
     property variant payable
     signal new_payment (variant payment)
 
-    function set_payable(new_payable) {
+    function set_tariffs_with_payable(tariffs, new_payable) {
+        if(tariffs === undefined) {
+            model.clear()
+            return
+        }
         payable = new_payable
-        for(var i=0; i<model.count; i++) {
-            var item = model.get(i)
-            model.setProperty(i, 'payment', payable ? payable.pay(item.tariff) : null)
-        }
-        emit_current_payment()
-    }
-
-    function set_tariffs(tariffs) {
-        var index = list.currentIndex
-        if(index != -1) {
-            list.currentItem.state = ''
-        }
-
-        model.clear()
-        if(tariffs) {
-            for(var i=0; i<tariffs.length;i++) {
-                var tariff = tariffs[i]
+        var suggested_tariff_idx = -1;
+        for(var i=0;i<tariffs.length;i++) {
+            var tariff = tariffs[i]
+            var payment = payable ? payable.pay(tariff) : null
+            if(i < model.count) {
+                model.setProperty(i, 'tariff', tariff)
+                model.setProperty(i, 'payment', payment)
+            } else {
                 model.append({
                     tariff: tariff,
-                    payment: payable ? payable.pay(tariff) : null
+                    payment: payment
                 })
             }
-
-            if(index == -1) {
-                index = 0
+            if(payment && payment.enabled && payable.tariff === tariff.id) {
+                suggested_tariff_idx = i;
             }
+        }
+        for(var i=tariffs.length;i<model.count;i++) {
+            model.remove(i)
+        }
 
-            if(index < model.count) {
-                list.currentIndex = index
-                list.currentItem.state = 'Details'
+        if(suggested_tariff_idx != -1 && suggested_tariff_idx != list.currentIndex) {
+            if(list.currentIndex != -1) {
+                    list.currentItem.state = ''
             }
+            list.currentIndex = suggested_tariff_idx
+            list.currentItem.state = 'Details'
+        } else {
+            emit_current_payment()
         }
     }
 
@@ -70,7 +72,6 @@ Rectangle {
 
         opacity: list.model.count ? 0 : 1
 
-        //text: "Поднесите карточку оператора"
         text: message
         font.pointSize: 25
     }
@@ -95,7 +96,12 @@ Rectangle {
             emit_current_payment()
         }
 
-        highlightMoveDuration: 500
+        highlightRangeMode: ListView.StrictlyEnforceRange
+        highlightFollowsCurrentItem: true
+        highlight: Rectangle {
+            focus: true
+        }
+        highlightMoveDuration: 10
 
         delegate: Rectangle {
             id: rect
@@ -113,11 +119,17 @@ Rectangle {
             MouseArea {
                 anchors.fill: parent
                 onClicked: {
+                    if(list.currentIndex != -1 && list.currentIndex != index) {
+                        list.currentItem.state = ''
+                    }
+
                     if(rect.state == 'Details') {
                         list.currentIndex = -1
+                        list.interactive = true
                         rect.state = ''
                     } else {
                         list.currentIndex = index
+                        list.interactive = false
                         rect.state = 'Details'
                     }
                 }
@@ -130,15 +142,13 @@ Rectangle {
                     PropertyChanges { target: rect; color: "lightsteelblue" }
                     PropertyChanges { target: rect; height: list.height - border.width }
                     PropertyChanges { target: rect; detailsOpacity: 1 }
-                    PropertyChanges { target: list; interactive: false }
-                    PropertyChanges { target: list; explicit: true; contentY: rect.y }
                 }
             ]
 
             transitions: Transition {
                 ParallelAnimation {
-                    ColorAnimation { property: "color"; duration: 500 }
-                    NumberAnimation { duration: 300; properties: "detailsOpacity,x,contentY,height,width" }
+                    ColorAnimation { property: "color"; duration: 300 }
+                    NumberAnimation { duration: 200; properties: "detailsOpacity,x,height,width" }
                 }
             }
 

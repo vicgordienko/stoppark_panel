@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Stoppark-1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2014-01-10 16:20+0200\n"
-"PO-Revision-Date: 2014-01-10 16:21+0200\n"
+"POT-Creation-Date: 2014-01-11 14:36+0200\n"
+"PO-Revision-Date: 2014-01-11 15:07+0200\n"
 "Last-Translator: Feanor <std.feanor@gmail.com>\n"
 "Language-Team: stdk <http://github.com/stdk>\n"
 "Language: ru_RU\n"
@@ -53,6 +53,7 @@ msgstr "Пополнение на "
 msgid "Cannot be refilled by this tariff."
 msgstr "Невозможно пополнить по этому тарифу."
 
+# Формат интервала дат при выводе на дисплей пользователя
 #: card.py:57
 #, python-format
 msgid "%(begin)s - %(end)s"
@@ -240,7 +241,7 @@ msgstr "Введите баркод"
 msgid "OK"
 msgstr "ОК"
 
-#: keyboard.py:50 payments.py:306 terminal_config.py:145
+#: keyboard.py:50 payments.py:322 terminal_config.py:145
 msgid "Cancel"
 msgstr "Отмена"
 
@@ -317,13 +318,33 @@ msgstr ""
 "<c><b>П А Р К У В А Л Ь Н И Й  Т А Л О Н</b></c>\n"
 "\n"
 
-#: payments.py:293
+# Формат даты для вывода на пользовательский дисплей
+#: payments.py:105
+#, python-format
+msgid "%x"
+msgstr ""
+
+# Формат времени для вывода на пользовательский дисплей
+#: payments.py:106
+#, python-format
+msgid "%X"
+msgstr ""
+
+#: payments.py:309
 msgid "Waiting for operator card..."
 msgstr "Поднесите карточку оператора"
 
-#: payments.py:305
+#: payments.py:321
 msgid "Pay"
 msgstr "Оплатить"
+
+#: payments.py:440
+msgid "Payment"
+msgstr "Оплата"
+
+#: payments.py:440
+msgid "Payment has been successful"
+msgstr "Оплата выполнена успешно"
 
 # Формат отчета в интерфейсе пользователя
 #: report.py:37
@@ -384,91 +405,91 @@ msgstr ""
 "     Сума в касі: {self.sum} грн.\n"
 "\n"
 
-#: tariff.py:136
+#: tariff.py:13
 msgid "unit_"
 msgid_plural "units_"
 msgstr[0] "раз"
 msgstr[1] "рази"
 msgstr[2] "разів"
 
-#: tariff.py:137 tariff.py:228 ticket.py:35
+#: tariff.py:14 tariff.py:231 ticket.py:35
 msgid "hour_"
 msgid_plural "hours_"
 msgstr[0] "година"
 msgstr[1] "години"
 msgstr[2] "годин"
 
-#: tariff.py:138 tariff.py:227 ticket.py:36
+#: tariff.py:15 tariff.py:230 ticket.py:36
 msgid "day_"
 msgid_plural "days_"
 msgstr[0] "доба"
 msgstr[1] "доби"
 msgstr[2] "діб"
 
-#: tariff.py:139 ticket.py:37
+#: tariff.py:16 ticket.py:37
 msgid "month_"
 msgid_plural "months_"
 msgstr[0] "місяць"
 msgstr[1] "місяці"
 msgstr[2] "місяців"
 
-#: tariff.py:155
+#: tariff.py:18
 msgid "unit"
 msgid_plural "units"
 msgstr[0] "раз"
 msgstr[1] "раза"
 msgstr[2] "раз"
 
-#: tariff.py:156 tariff.py:234
+#: tariff.py:19 tariff.py:237
 msgid "hour"
 msgid_plural "hours"
 msgstr[0] "час"
 msgstr[1] "часа"
 msgstr[2] "часов"
 
-#: tariff.py:157 tariff.py:233
+#: tariff.py:20 tariff.py:236
 msgid "day"
 msgid_plural "days"
 msgstr[0] "день"
 msgstr[1] "дня"
 msgstr[2] "дней"
 
-#: tariff.py:158
+#: tariff.py:21
 msgid "month"
 msgid_plural "months"
 msgstr[0] "месяц"
 msgstr[1] "месяца"
 msgstr[2] "месяцев"
 
-#: tariff.py:177 tariff.py:184 tariff.py:191
+#: tariff.py:180 tariff.py:187 tariff.py:194
 #, python-format
 msgid "$%(cost)s/%(interval)s"
 msgstr "%(cost)s грн./%(interval)s"
 
-#: tariff.py:203
+#: tariff.py:206
 msgid "Zero time: "
 msgstr "Расчетное время: "
 
-#: tariff.py:209
+#: tariff.py:212
 #, python-format
 msgid "Max per day: $%i"
 msgstr "Максимум за день: %i грн."
 
-#: tariff.py:229
+#: tariff.py:232
 msgid "minute_"
 msgid_plural "minutes_"
 msgstr[0] "хвилина"
 msgstr[1] "хвилини"
 msgstr[2] "хвилин"
 
-#: tariff.py:235
+#: tariff.py:238
 msgid "minute"
 msgid_plural "minutes"
 msgstr[0] "минута"
 msgstr[1] "минуты"
 msgstr[2] "минут"
 
-#: tariff.py:238
+#: tariff.py:241
 #, python-format
 msgid ""
 "Duration: %(duration)s.\n"
@@ -477,7 +498,7 @@ msgstr ""
 "Длительность парковки: %(duration)s.\n"
 "Единиц оплаты: %(units)i"
 
-#: tariff.py:465
+#: tariff.py:468
 #, python-format
 msgid "After refill: from %(begin)s to %(end)s"
 msgstr "После пополнения: с %(begin)s по %(end)s"

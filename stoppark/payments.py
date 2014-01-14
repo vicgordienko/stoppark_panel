@@ -23,7 +23,6 @@ class TicketReader(object):
         self.regex = re.compile(r'(;(?P<bar>\d+)\?\r\n)')
         self.peer = peer
         self.new_payable = new_payable
-        self.buf = ''
         self.ticket = None
 
     def handle_bar(self, bar, db):
@@ -38,19 +37,62 @@ class TicketReader(object):
 
     def __call__(self, db):
         sock = SafeSocket(self.peer)
+        buf = ''
         while True:
-            self.buf += sock.recv(128)
-            print 'ticket_buf', self.buf
+            buf += sock.recv(128)
+            print 'ticket_buf', buf
 
             last_index = 0
-            for match in self.regex.finditer(self.buf):
+            for match in self.regex.finditer(buf):
                 last_index = match.span()[1]
                 bar = match.group('bar')
                 if len(bar) < 18:
                     continue
                 self.handle_bar(bar, db)
 
-            self.buf = self.buf[last_index:]
+            buf = buf[last_index:]
+
+
+class CardReader(object):
+    def __init__(self, peer, new_payable, new_operator):
+        self.regex = re.compile(r'(;(?P<sn>[A-Z\d]+)\?)')
+        self.peer = peer
+        self.new_payable = new_payable
+        self.new_operator = new_operator
+        self.buf = ''
+        self.card = None
+
+    def handle_card(self, sn, db):
+        print 'handle_card', sn
+        self.card = db.get_card(sn)
+        if self.card:
+            if self.card.type in [Card.CLIENT]:
+                self.new_payable.emit(self.card, db.get_tariffs())
+            if self.card.type in [Card.CASHIER, Card.ADMIN]:
+                self.new_operator.emit(self.card)
+
+    @staticmethod
+    def card_read_loop(sock):
+        while True:
+            sock.send('n')
+            sleep(1)
+
+    def __call__(self, db):
+        sock = SafeSocket(self.peer)
+        spawn(self.card_read_loop, sock)
+        buf = ''
+        while True:
+            buf += sock.recv(128)
+            print 'card_buf', buf
+
+            last_index = 0
+            for match in self.regex.finditer(buf):
+                last_index = match.span()[1]
+                bar = match.group('sn')
+
+                self.handle_card(bar, db)
+
+            buf = buf[last_index:]
 
 
 class DisplayLoop(object):
@@ -59,15 +101,21 @@ class DisplayLoop(object):
         self.queue = None
 
     def time_loop(self, sock):
+        line_length = 20
+        date_format = _('%x')
+        time_format = _('%X')
         while True:
             now = datetime.now()
-            self.display(sock, [u' '*6 + u'%s' % (now.strftime('%x'),), u' '*6 + u'%s' % (now.strftime('%X'),)])
+            self.display(sock, [
+                now.strftime(date_format).center(line_length),
+                now.strftime(time_format).center(line_length)
+            ])
             sleep(1)
 
     def __call__(self):
         self.queue = Queue()
         sock = SafeSocket(self.peer)
-        # '\x02\x05\x53\x3c\x03' set russian character set, optional for previously configured display
+        # '\x02\x05\x53\x3c\x03' set russian character set, this command is redundant for already configured display
         sock.send('\x1b\x40' '\x02\x05\x53\x3c\x03' '\x0c')  # initialize display and clear screen
         time_loop = spawn(self.time_loop, sock)
         while True:
@@ -116,39 +164,7 @@ class Reader(QObject):
 
         self.display_loop = DisplayLoop('/tmp/screen')
         self.ticket_reader = TicketReader('/tmp/bar', self.new_payable)
-
-    @staticmethod
-    def _card_read_loop(sock):
-        while True:
-            sock.send('n')
-            sleep(1)
-
-    def _card_loop(self):
-        bar_regex = re.compile(r'(;(?P<sn>[A-Z\d]+)\?)')
-        sock = SafeSocket('/tmp/card')
-        spawn(self._card_read_loop, sock)
-        buf = ''
-        while True:
-            buf += sock.recv(128)
-            print 'card_buf', buf
-
-            last_index = 0
-            for match in bar_regex.finditer(buf):
-                last_index = match.span()[1]
-                bar = match.group('sn')
-
-                self._handle_card(bar)
-
-            buf = buf[last_index:]
-
-    def _handle_card(self, sn):
-        print '_handle_card', sn
-        self._card = self.db.get_card(sn)
-        if self._card:
-            if self._card.type in [Card.CLIENT]:
-                self.new_payable.emit(self._card, self.db.get_tariffs())
-            if self._card.type in [Card.CASHIER, Card.ADMIN]:
-                self.new_operator.emit(self._card)
+        self.card_reader = CardReader('/tmp/card', self.new_payable, self.new_operator)
 
     def _tariff_updater(self):
         while True:
@@ -169,7 +185,7 @@ class Reader(QObject):
 
         spawn(self._async_processor)
         spawn(self.ticket_reader, self.db)
-        spawn(self._card_loop)
+        spawn(self.card_reader, self.db)
         spawn(self.display_loop)
 
         session = self.db.local.session()
@@ -357,9 +373,11 @@ class Payments(QWidget):
 
     def update_tariffs(self, tariffs):
         if self.tariffs is None and tariffs is not None:
+            self.tariffs = tariffs
             self.ready_to_accept()
-        self.tariffs = tariffs
-        self.ui.tariffs.rootObject().set_tariffs(self.tariffs)
+        else:
+            self.tariffs = tariffs
+            self.ui.tariffs.rootObject().set_tariffs_with_payable(self.tariffs, self.payable)
 
     def ready_to_accept(self):
         print 'ready_to_accept'
@@ -370,7 +388,7 @@ class Payments(QWidget):
         self.ui.keyboard.setEnabled(True)
 
         self.payable = OncePayable()
-        self.ui.tariffs.rootObject().set_payable(self.payable)
+        self.ui.tariffs.rootObject().set_tariffs_with_payable(self.tariffs, self.payable)
         self.reader.new_payable.connect(self.handle_payable)
 
     def ready_to_pay(self):
@@ -379,17 +397,19 @@ class Payments(QWidget):
 
     @pyqtSlot(QObject, list)
     def handle_payable(self, payable, tariffs):
-        self.reader.new_payable.disconnect(self.handle_payable)
+        try:
+            self.reader.new_payable.disconnect(self.handle_payable)
+        except TypeError:  # .disconnect raises TypeError when given signal is not connected
+            pass
+
         self.new_payment.emit()
 
         self.tariffs = tariffs
-        self.ui.tariffs.rootObject().set_tariffs(tariffs)
-
         self.payable = payable
         self.ui.cancel.setEnabled(True)
         self.ui.keyboard.setEnabled(False)
 
-        self.ui.tariffs.rootObject().set_payable(self.payable)
+        self.ui.tariffs.rootObject().set_tariffs_with_payable(self.tariffs, self.payable)
 
     def handle_payment(self, payment):
         payment = payment.toPyObject()
@@ -421,7 +441,7 @@ class Payments(QWidget):
         self.payment = None
         self.ui.progress.setVisible(False)
         self.reader.payment_processed.disconnect(self.payment_completed)
-        self.notifier.showMessage(u'Оплата', u'Оплата выполнена успешно')
+        self.notifier.showMessage(_('Payment'), _('Payment has been successful'))
         self.ui.tariffs.setEnabled(True)
         self.ready_to_accept()
 

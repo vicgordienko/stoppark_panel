@@ -192,7 +192,7 @@ class Card(QObject):
         self.model = fields[13]
         self.color = fields[14]
         self.status = int(fields[15])
-        self.tariff_type = fields[16]
+        self.tariff_type = int(fields[16]) if fields[16] != 'None' else None
         self.tariff_price = fields[17]
         self.tariff_sum = fields[18]
 
@@ -217,6 +217,10 @@ class Card(QObject):
     @pyqtProperty(str, constant=True)
     def fio(self):
         return ('%s %s %s' % (self.drive_fname, self.drive_name, self.drive_sname)).decode('utf8', errors='replace')
+
+    @pyqtProperty(int, constant=True)
+    def tariff(self):
+        return self.tariff_type
 
     @pyqtProperty(str, constant=True)
     def fio_short(self):

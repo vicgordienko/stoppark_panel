@@ -279,7 +279,7 @@ class Ticket(QObject):
 
         self.id = fields[1]
         self._bar = fields[2]
-        self.tariff_type = fields[3]
+        self.tariff_type = int(fields[3]) if fields[3] != 'None' else None
         self.tariff_price = fields[4]
         self.tariff_sum = fields[5]
         self.tariff_sum_excess = fields[6]
@@ -292,9 +292,13 @@ class Ticket(QObject):
     def __del__(self):
         print '~Ticket'
 
-    @pyqtProperty(str)
+    @pyqtProperty(str, constant=True)
     def bar(self):
         return self._bar
+
+    @pyqtProperty(int, constant=True)
+    def tariff(self):
+        return self.tariff_type
 
     @pyqtSlot(QObject, result=QObject)
     def pay(self, tariff):
