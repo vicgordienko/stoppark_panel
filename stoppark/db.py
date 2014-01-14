@@ -172,16 +172,14 @@ class DB(QObject):
         QObject.__init__(self, parent)
 
         self.addr = (host, port)
-        self._strings = None, [
-            u'ТОВ "КАРД-СIСТЕМС"',
-            u'м. Київ',
-            u'проспект перемоги, 123',
-            u'(+380 44) 284 0888',
-            u'ЗРАЗОК',
-            u'УВАГА! Талон не згинати',
-            u'ЗА ВТРАТУ ТАЛОНУ ШТРАФ',
-            u'',
-        ]
+        self._strings = None, _('CARD-SYSTEMS\n'
+                                'Kyiv\n'
+                                'Peremohy ave, 123\n'
+                                '(+380 44) 284 0888\n'
+                                'EXAMPLE\n'
+                                'CAUTION! Do not crumple tickets!\n'
+                                'Ticket loss will be penalized\n'
+                                'EXAMPLE').split(u'\n')
         self.notify = notify
         self.local = LocalDB()
 
@@ -207,12 +205,10 @@ class DB(QObject):
         except socket.error as e:
             print e.__class__.__name__, e
             if self.notify:
-                #self.notify(u'Ошибка БД', u'Нет связи с удалённой базой данных')
                 self.notify(_("Database Error"), q.decode('utf8', errors='replace'))
             return False
 
         if answer == 'FAIL':
-            #raise Exception('FAIL on query: %s' % (q,))
             self.notify(_("Query Error"), q.decode('utf8', errors='replace'))
             return False
         if answer == 'NONE':
@@ -309,46 +305,6 @@ class DB(QObject):
 
         return self.query(self.PAYMENT_QUERY.format(console=0, operator=operator, status=Ticket.PAID,
                                                     now=now, **db_payment_args), local=True) is None
-
-    PAYMENT_QUERY2 = 'insert into payment values(NULL,"%s",%i,%i,"%s","%s","%s",%i,%i,%i*100,%i,"%s","%s",%i*100)'
-
-    def generate_payment2(self, ticket_payment=None, card_payment=None, once_payment=None):
-        if ticket_payment is None and card_payment is None and once_payment is None:
-            print 'No payment to generate.'
-            return None
-
-        session = self.local.session()
-        operator = session[1] if session is not None else '?'
-
-        if ticket_payment:
-            payment_args = ("Talon payment", ticket_payment.tariff.id, 0,
-                            operator, datetime.now().strftime(DATETIME_FORMAT),
-                            ticket_payment.ticket.bar, Ticket.PAID, ticket_payment.tariff.id,
-                            ticket_payment.result.cost, ticket_payment.result.units,
-                            ticket_payment.ticket.time_in.strftime(DATETIME_FORMAT_FULL),
-                            ticket_payment.now.strftime(DATETIME_FORMAT_FULL),
-                            ticket_payment.result.price)
-            return self.query(self.PAYMENT_QUERY % payment_args, local=True) is None
-
-        if once_payment:
-            now = datetime.now().strftime(DATETIME_FORMAT_FULL)
-            payment_args = ('Single payment', once_payment.tariff.id, 0,
-                            operator, now,
-                            '', 0, once_payment.tariff.id,
-                            once_payment.price, 1,
-                            now, now, once_payment.price)
-
-            return self.query(self.PAYMENT_QUERY % payment_args, local=True) is None
-
-        if card_payment:
-            now = datetime.now().strftime(DATETIME_FORMAT)
-            payment_args = ('Card payment', card_payment.tariff.id, 0,
-                            operator, now,
-                            card_payment.card.sn, Ticket.PAID, card_payment.tariff.id,
-                            card_payment.result.cost, card_payment.result.units,
-                            card_payment.result.begin, card_payment.result.end,
-                            card_payment.result.price)
-            return self.query(self.PAYMENT_QUERY % payment_args, local=True) is None
 
 
 if __name__ == '__main__':

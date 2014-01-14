@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Stoppark-1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2014-01-11 14:36+0200\n"
-"PO-Revision-Date: 2014-01-11 15:07+0200\n"
+"POT-Creation-Date: 2014-01-14 16:58+0200\n"
+"PO-Revision-Date: 2014-01-14 17:04+0200\n"
 "Last-Translator: Feanor <std.feanor@gmail.com>\n"
 "Language-Team: stdk <http://github.com/stdk>\n"
 "Language: ru_RU\n"
@@ -22,6 +22,7 @@ msgstr ""
 "X-Poedit-KeywordsList: _\n"
 "X-Generator: Poedit 1.5.7\n"
 
+# Информация о считанной карточке в интерфейсе оператора.
 #: card.py:36
 #, python-format
 msgid ""
@@ -160,15 +161,36 @@ msgstr "не удалось"
 msgid "Update: %(message)s (%(now)s)"
 msgstr "Обновление: %(message)s (%(now)s)"
 
-#: db.py:211
+# Значения конфигурационных строк по умолчанию
+#: db.py:175
+msgid ""
+"CARD-SYSTEMS\n"
+"Kyiv\n"
+"Peremohy ave, 123\n"
+"(+380 44) 284 0888\n"
+"EXAMPLE\n"
+"CAUTION! Do not crumple tickets!\n"
+"Ticket loss will be penalized\n"
+"EXAMPLE"
+msgstr ""
+"ТОВ \"КАРД-СIСТЕМС\n"
+"м. Київ\n"
+"проспект перемоги, 123\n"
+"(+380 44) 284 0888\n"
+"ЗРАЗОК\n"
+"УВАГА! Талон не згинати\n"
+"ЗА ВТРАТУ ТАЛОНУ ШТРАФ\n"
+"ЗРАЗОК"
+
+#: db.py:219
 msgid "Database Error"
 msgstr "Нет связи с базой данных"
 
-#: db.py:216
+#: db.py:223
 msgid "Query Error"
 msgstr "Ошибка запроса к базе данных"
 
-#: db.py:297
+#: db.py:304
 msgid ""
 "Automatic system\n"
 "of payed parking\n"
@@ -182,7 +204,7 @@ msgstr ""
 
 #: gui.py:41
 msgid "Stop-Park"
-msgstr ""
+msgstr "Стоп-Парк"
 
 #: gui.py:44
 msgid "Config"
@@ -322,13 +344,13 @@ msgstr ""
 #: payments.py:105
 #, python-format
 msgid "%x"
-msgstr ""
+msgstr "%x"
 
 # Формат времени для вывода на пользовательский дисплей
 #: payments.py:106
 #, python-format
 msgid "%X"
-msgstr ""
+msgstr "%X"
 
 #: payments.py:309
 msgid "Waiting for operator card..."
@@ -338,11 +360,11 @@ msgstr "Поднесите карточку оператора"
 msgid "Pay"
 msgstr "Оплатить"
 
-#: payments.py:440
+#: payments.py:444
 msgid "Payment"
 msgstr "Оплата"
 
-#: payments.py:440
+#: payments.py:444
 msgid "Payment has been successful"
 msgstr "Оплата выполнена успешно"
 
@@ -515,6 +537,7 @@ msgstr "Наименование"
 msgid "Terminal config"
 msgstr "Настройка терминалов"
 
+# Информация в интерфейсе оператора о невозможности оплатить талон по выбранному тарифу.
 #: ticket.py:68 ticket.py:134 ticket.py:191
 #, python-format
 msgid ""
@@ -524,6 +547,7 @@ msgstr ""
 "Талон %s.\n"
 "Невозможно оплатить по этому тарифу"
 
+# Формат информации об оплате талона в интерфейсе пользователя.
 #: ticket.py:70
 #, python-format
 msgid ""
@@ -559,6 +583,7 @@ msgstr ""
 "<hr />\n"
 "<<%(bar)s>>"
 
+# Формат информации о доплате талона в интерфейсе пользователя.
 #: ticket.py:136
 #, python-format
 msgid ""
