@@ -227,7 +227,7 @@ class Ticket(QObject):
     PAID = 5
     OUT = 15
 
-    EXCESS_INTERVAL = 15 * 60  # seconds
+    EXCESS_INTERVAL = 15 * 60  # seconds, TODO: use LocalDB cache to fetch this value instead of constant
 
     @staticmethod
     def remove(db, bar):

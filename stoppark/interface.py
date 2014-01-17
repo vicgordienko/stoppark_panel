@@ -219,22 +219,25 @@ class TerminalReader(DumpableStructure):
     def process(self, terminal, addr, direction, mainloop):
         if self.status == self.CARD_READ and self.time < self.TIMEOUT:
             card = mainloop.db.get_card(self.sn)
-            mainloop.notify.emit(_('Card at terminal'), u'%s' % (card.fio,))
+            card_info = card.fio if card else _('Unknown card')
+            mainloop.notify.emit(_('Card at terminal'), u'%s' % (card_info,))
             if card and card.check(direction):
-                mainloop.notify.emit(_('Access permitted.'), u'%s' % (card.fio,))
+                mainloop.notify.emit(_('Access permitted.'), u'%s' % (card_info,))
                 TerminalState('man', 'in_open').set(terminal, addr, mainloop.db)
                 TerminalMessage(_('Access permitted.')).set(terminal, addr)
             else:
-                mainloop.notify.emit(_('Access denied.'), u'%s' % (card.fio,))
+                mainloop.notify.emit(_('Access denied.'), u'%s' % (card_info,))
                 TerminalMessage(_('Access denied.')).set(terminal, addr)
         if self.status == self.CARD_IN:
             card = mainloop.db.get_card(self.sn)
-            mainloop.notify.emit(_('Car inside'), u'%s' % (card.fio,))
-            card.moved(mainloop.db, addr, inside=True)
+            if card:
+                mainloop.notify.emit(_('Car inside'), u'%s' % (card.fio,))
+                card.moved(mainloop.db, addr, inside=True)
         if self.status == self.CARD_OUT:
             card = mainloop.db.get_card(self.sn)
-            mainloop.notify.emit(_('Car outside'), u'%s' % (card.fio,))
-            card.moved(mainloop.db, addr, inside=False)
+            if card:
+                mainloop.notify.emit(_('Car outside'), u'%s' % (card.fio,))
+                card.moved(mainloop.db, addr, inside=False)
 
 
 class TerminalReaders(Structure):

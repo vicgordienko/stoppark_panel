@@ -260,6 +260,7 @@ class Reader(QObject):
 
     @async
     def begin_session(self, card):
+        self.db.update_config()
         self.db.local.session_begin(card)
         self.session_begin.emit(card.sn, card.fio)
 
@@ -358,11 +359,19 @@ class Payments(QWidget):
                 return self.reader.end_session()
         self.reader.new_operator.connect(self.handle_operator)
 
+    @staticmethod
+    def disconnect_from_signal(signal, slot):
+        try:
+            signal.disconnect(slot)
+            return True
+        except TypeError:  # .disconnect raises TypeError when given signal is not connected
+            return False
+
     @pyqtSlot(QObject)
     def handle_operator(self, card):
         print 'operator', card
-        self.reader.new_operator.disconnect(self.handle_operator)
-        self.session_dialog.emit(card)
+        if self.disconnect_from_signal(self.reader.new_operator, self.handle_operator):
+            self.session_dialog.emit(card)
 
     def manual_ticket_input(self):
         self.reader.new_payable.disconnect(self.handle_payable)

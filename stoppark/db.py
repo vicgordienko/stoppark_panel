@@ -6,7 +6,7 @@ from time import clock as measurement
 from ticket import Ticket
 from card import Card
 from tariff import Tariff
-from config import db_filename, DATETIME_FORMAT, DATETIME_FORMAT_FULL
+from config import db_filename, DATETIME_FORMAT
 import sqlite3
 from i18n import language
 _ = language.ugettext
@@ -21,6 +21,9 @@ def measure(f):
         return ret
 
     return wrapper
+
+
+FREE_PLACES_UPDATE_INTERVAL = 5
 
 
 class LocalDB(object):
@@ -74,6 +77,27 @@ class LocalDB(object):
         placefree integer
     );
     replace into gstatus(id, placefree) values(0, 100);
+
+    create table if not exists config (
+        Config text,
+        id integer primary key,
+        PlaceNum integer,
+        FreeTime integer,
+        PayTime text,
+        TarifName1 text,
+        TarifName2 text,
+        TarifName3 text,
+        TarifName4 text,
+        UserStr1 text,
+        UserStr2 text,
+        UserStr3 text,
+        UserStr4 text,
+        UserStr5 text,
+        UserStr6 text,
+        UserStr7 text,
+        UserStr8 text
+    );
+
     create table if not exists session (
         id integer primary key default (null),
         sn text,
@@ -92,6 +116,21 @@ class LocalDB(object):
         self.conn.text_factory = str
         with self.conn as c:
             c.executescript(LocalDB.script)
+
+        if self.query('select count(*) from config')[0][0] == 0:
+            with self.conn as c:
+                default_strings = _('CARD-SYSTEMS\n'
+                                    'Kyiv\n'
+                                    'Peremohy ave, 123\n'
+                                    '(+380 44) 284 0888\n'
+                                    'EXAMPLE\n'
+                                    'CAUTION! Do not crumple tickets!\n'
+                                    'Ticket loss will be penalized\n'
+                                    'EXAMPLE').split(u'\n')
+                c.execute('insert into config(id,PlaceNum,FreeTime,'
+                          'UserStr1,UserStr2,UserStr3,UserStr4,'
+                          'UserStr5,UserStr6,UserStr7,UserStr8)'
+                          ' values(null,100,15,?,?,?,?,?,?,?,?)', default_strings)
 
         self.free_places_update_time = None
 
@@ -128,11 +167,13 @@ class LocalDB(object):
         if self.free_places_update_time is None:
             return 0, False
 
-        return self.query('select placefree from gstatus')[0][0], measurement() - self.free_places_update_time < 5
+        return (self.query('select placefree from gstatus')[0][0],
+                measurement() - self.free_places_update_time < FREE_PLACES_UPDATE_INTERVAL)
 
     def update_terminals(self, terminals):
         with self.conn as c:
-            c.executescript('create table terminal_remote (id integer primary key, title text);')
+            c.executescript('drop table if exists terminal_remote;'
+                            'create table terminal_remote (id integer primary key, title text);')
             c.executemany('insert into terminal_remote values(?,?)', terminals)
             c.executescript('delete from terminal where id not in (select id from terminal_remote);'
                             'insert into terminal(id,title) select id,title from terminal_remote '
@@ -162,6 +203,23 @@ class LocalDB(object):
     def get_tariffs(self):
         return self.query('select * from tariffs')
 
+    def update_config(self, config):
+        with self.conn as c:
+            c.execute('update config set Config=?,id=?,PlaceNum=?,FreeTime=?,PayTime=?,'
+                      'TarifName1=?,TarifName2=?,TarifName3=?,TarifName4=?,'
+                      'UserStr1=?,UserStr2=?,UserStr3=?,UserStr4=?,'
+                      'UserStr5=?,UserStr6=?,UserStr7=?,UserStr8=?', *config)
+
+    def get_config_strings(self):
+        return [s.decode('utf8') for s in self.query('select UserStr1,UserStr2,UserStr3,UserStr4,'
+                                                     'UserStr5,UserStr6,UserStr7,UserStr8 from config')[0]]
+
+    def get_free_time(self):
+        try:
+            return int(self.query('select FreeTime from config')[0][0])
+        except (ValueError, KeyError):
+            return None
+
 
 class DB(QObject):
     free_places_update = pyqtSignal(int)
@@ -172,14 +230,6 @@ class DB(QObject):
         QObject.__init__(self, parent)
 
         self.addr = (host, port)
-        self._strings = None, _('CARD-SYSTEMS\n'
-                                'Kyiv\n'
-                                'Peremohy ave, 123\n'
-                                '(+380 44) 284 0888\n'
-                                'EXAMPLE\n'
-                                'CAUTION! Do not crumple tickets!\n'
-                                'Ticket loss will be penalized\n'
-                                'EXAMPLE').split(u'\n')
         self.notify = notify
         self.local = LocalDB()
 
@@ -229,10 +279,11 @@ class DB(QObject):
         return dict((int(key), value.decode('utf8', errors='replace')) for key, value in self.local.get_terminals())
 
     def get_tariffs(self):
+        free_time = self.get_free_time()
         ret = self.query('select * from tariff')
         if ret:
             self.local.update_tariffs(ret)
-        return filter(lambda x: x is not None, [Tariff.create(t) for t in self.local.get_tariffs()])
+        return filter(lambda x: x is not None, [Tariff.create(t, free_time) for t in self.local.get_tariffs()])
 
     def get_total_places(self):
         ret = self.query('select PlaceNum from config')
@@ -279,15 +330,16 @@ class DB(QObject):
 
         return self.query(self.PASS_QUERY % args, local=True)
 
-    CONFIG_QUERY = 'select userstr1,userstr2,userstr3,userstr4,userstr5,userstr6,userstr7,userstr8 from config'
+    def update_config(self):
+        response = self.query('select * from config')
+        if response:
+            self.local.update_config(response)
 
     def get_config_strings(self):
-        now = datetime.now()
-        if self._strings[0] is None or (now - self._strings[0]).total_seconds() > self.STRINGS_UPDATE_INTERVAL:
-            ret = self.query(self.CONFIG_QUERY)
-            if ret:
-                self._strings = datetime.now(), [s.decode('utf8', errors='replace') for s in ret[0]]
-        return self._strings[1]
+        return self.local.get_config_strings()
+
+    def get_free_time(self):
+        return self.local.get_free_time()
 
     def get_check_header(self):
         return u'<c><hr />\n' + _('Automatic system\n'

@@ -101,7 +101,7 @@ Rectangle {
         highlight: Rectangle {
             focus: true
         }
-        highlightMoveDuration: 10
+        highlightMoveDuration: 150
 
         delegate: Rectangle {
             id: rect

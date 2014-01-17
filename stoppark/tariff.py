@@ -21,6 +21,9 @@ _n('day', 'days', 1)
 _n('month', 'months', 1)
 
 
+DEFAULT_FREE_TIME = 15
+
+
 class Tariff(QObject):
     """
     This is a base class for all tariffs in stoppark.
@@ -42,8 +45,6 @@ class Tariff(QObject):
     PREPAID = 5
     SUBSCRIPTION = 6
 
-    FREE_TIME = 60*15
-
     TYPES = {}
 
     @staticmethod
@@ -59,7 +60,7 @@ class Tariff(QObject):
         return wrapper
 
     @staticmethod
-    def create(response):
+    def create(response, free_time=None):
         """
         Initializes Tariff instance using response from remote database.
         @param response: response from remote database query that fetches tariff information
@@ -70,14 +71,24 @@ class Tariff(QObject):
         """
         if response is False:
             return False
+        if free_time is None:
+            free_time = DEFAULT_FREE_TIME
+        free_time *= 60
         try:
             assert(len(response) >= 8)
-            return Tariff.TYPES[int(response[2])](response)
-        except (TypeError, AssertionError, IndexError, ValueError, KeyError):
+            return Tariff.TYPES[int(response[2])](response, free_time=free_time)
+        except (TypeError, AssertionError, IndexError, ValueError, KeyError) as e:
             return None
+            #import sys
+            #import traceback
+            #for line in traceback.format_exception(*sys.exc_info()):
+            #    print line
 
-    def __init__(self, fields):
+    def __init__(self, fields, free_time=None):
         QObject.__init__(self)
+        if free_time is None:
+            free_time = DEFAULT_FREE_TIME * 60
+        self.free_time = free_time
         self.fields = fields
 
         self._id = int(fields[0])
@@ -116,9 +127,9 @@ class Tariff(QObject):
         """
         delta = end - begin
         seconds = delta.total_seconds()
-        if seconds < Tariff.FREE_TIME:
+        if seconds < self.free_time:
             return delta, 0
-        return delta, int(ceil((seconds - Tariff.FREE_TIME) / Tariff.DIVISORS[self.interval]))
+        return delta, int(ceil((seconds - self.free_time) / Tariff.DIVISORS[self.interval]))
 
     def paid_time(self, units):
         return timedelta(seconds=units * Tariff.DIVISORS[self.interval])
@@ -244,8 +255,11 @@ class TicketTariffResult(object):
                      'units': self.units
                  }
 
+    def state(self):
+        return self.days, self.hours, self.minutes, self.units, self.paid_time, self.price
+
     def __repr__(self):
-        return str((self.days, self.hours, self.minutes, self.units, self.paid_time, self.price))
+        return str(self.state())
 
 
 class FixedTariffResult(TicketTariffResult):
@@ -283,85 +297,8 @@ class FixedTariffResult(TicketTariffResult):
 
 @Tariff.register(Tariff.FIXED)
 class FixedTariff(Tariff):
-    """
-    >>> tariff = Tariff.create(['1', 'Час 1 грн.', '1', '1', '1', 'None', 'None', 'None'])
-    >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,10,0))
-    (0, 0, 10, 0, datetime.timedelta(0, 600), 0)
-    >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,45,0))
-    (0, 0, 45, 1, datetime.timedelta(0, 3600), 1)
-    >>> tariff.calc(datetime(2013,10,28,9,0,0), datetime(2013,10,28,14,45,0))
-    (0, 5, 45, 6, datetime.timedelta(0, 21600), 6)
-    >>> tariff.calc(datetime(2013,12,1,9,0,0), datetime(2013,12,2,10,0,0))
-    (1, 1, 0, 25, datetime.timedelta(1, 3600), 25)
-    >>> tariff.calc(datetime(2013,12,1,23,55,0), datetime(2013,12,2,3,25,0))
-    (0, 3, 30, 4, datetime.timedelta(0, 14400), 4)
-    >>> tariff.calc(datetime(2014,2,28,23,30,0), datetime(2014,3,1,4,0,0))
-    (0, 4, 30, 5, datetime.timedelta(0, 18000), 5)
-    >>> tariff.calc(datetime(2008,2,28,23,30,0), datetime(2008,2,29,2,0,0))
-    (0, 2, 30, 3, datetime.timedelta(0, 10800), 3)
-    >>> tariff.calc(datetime(2008,2,28,23,30,0), datetime(2008,3,1,2,0,0))
-    (1, 2, 30, 27, datetime.timedelta(1, 10800), 27)
-    >>> tariff.calc(datetime(2013,11,30,23,55,0), datetime(2013,12,1,0,5,0))
-    (0, 0, 10, 0, datetime.timedelta(0, 600), 0)
-    >>> tariff.calc(datetime(2013,10,30,23,50,0), datetime(2013,10,31,1,0,0))
-    (0, 1, 10, 1, datetime.timedelta(0, 4200), 1)
-    >>> tariff.calc(datetime(2013,9,30,22,0,0), datetime(2013,10,1,9,0,0))
-    (0, 11, 0, 11, datetime.timedelta(0, 39600), 11)
-    >>> tariff.calc(datetime(2013,10,31,22,0,0), datetime(2013,11,1,9,0,0))
-    (0, 11, 0, 11, datetime.timedelta(0, 39600), 11)
-    >>> tariff.calc(datetime(2013,11,30,23,0,0), datetime(2013,12,1,8,0,0))
-    (0, 9, 0, 9, datetime.timedelta(0, 32400), 9)
-    >>> tariff.calc(datetime(2013,12,9,9,0,0), datetime(2014,12,10,9,0,0))
-    (366, 0, 0, 8784, datetime.timedelta(366), 8784)
-    >>> tariff.calc(datetime(2013,12,9,23,0,0), datetime(2014,1,10,23,0,0))
-    (32, 0, 0, 768, datetime.timedelta(32), 768)
-    >>> tariff.calc(datetime(2013,12,31,23,59,59), datetime(2014,1,1,1,0,0))
-    (0, 1, 0, 1, datetime.timedelta(0, 3601), 1)
-    >>> tariff.calc(datetime(2013,12,9,10,0,0), datetime(2013,12,9,10,15,1))
-    (0, 0, 15, 1, datetime.timedelta(0, 3600), 1)
-    >>> tariff.calc(datetime(2013,10,26,23,0,0), datetime(2013,10,27,1,0,0))
-    (0, 2, 0, 2, datetime.timedelta(0, 7200), 2)
-    >>> tariff.calc(datetime(2013,10,24,9,0,0), datetime(2013,10,21,10,0,0))
-    (-3, 1, 0, 0, datetime.timedelta(-3, 3600), 0)
-    >>> tariff.calc(datetime(2013,10,24,9,0,0), datetime(2013,10,24,8,50,0))
-    (-1, 23, 50, 0, datetime.timedelta(-1, 85800), 0)
-
-    >>> tariff = Tariff.create(['1', 'Час 1 грн. X', '1', '2', '1', '09:00', 'None', 'None'])
-    >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,11,10,0))
-    (2, 3, 10, 4, datetime.timedelta(3, 3600), 4)
-    >>> tariff.calc(datetime(2013,12,9,11,0,0), datetime(2013,12,10,8,0,0))
-    (0, 21, 0, 1, datetime.timedelta(0, 79200), 1)
-    >>> tariff.calc(datetime(2013,11,30,8,0,0), datetime(2013,12,1,9,0,0))
-    (1, 1, 0, 2, datetime.timedelta(1, 3600), 2)
-    >>> tariff.calc(datetime(2008,2,28,16,0,0), datetime(2008,2,29,16,10,0))
-    (1, 0, 10, 2, datetime.timedelta(1, 61200), 2)
-    >>> tariff.calc(datetime(2008,2,28,8,0,0), datetime(2008,3,1,10,0,0))
-    (2, 2, 0, 4, datetime.timedelta(3, 3600), 4)
-    >>> tariff.calc(datetime(2014,2,27,9,0,0), datetime(2014,3,1,10,10,0))
-    (2, 1, 10, 3, datetime.timedelta(3), 3)
-    >>> tariff.calc(datetime(2013,12,31,23,0,0), datetime(2014,1,1,9,5,0))
-    (0, 10, 5, 1, datetime.timedelta(0, 36300), 1)
-    >>> tariff.calc(datetime(2013,12,9,8,0,0), datetime(2013,12,9,8,50,0))
-    (0, 0, 50, 1, datetime.timedelta(0, 3600), 1)
-    >>> tariff.calc(datetime(2013,12,9,9,0,0), datetime(2014,1,10,11,10,0))
-    (32, 2, 10, 33, datetime.timedelta(33), 33)
-    >>> tariff.calc(datetime(2013,12,1,9,0,0), datetime(2014,11,1,10,10,0))
-    (335, 1, 10, 336, datetime.timedelta(336), 336)
-    >>> tariff.calc(datetime(2013,12,3,9,0,0), datetime(2013,12,1,9,0,0))
-    (-2, 0, 0, 0, datetime.timedelta(-2), 0)
-    >>> tariff.calc(datetime(2013,10,24,9,0,0), datetime(2013,10,24,8,50,0))
-    (-1, 23, 50, 0, datetime.timedelta(-1, 85800), 0)
-
-    >>> tariff = Tariff.create(['1', 'Час 1 грн.', '1', '1', '1', 'None', '100', 'None'])
-    >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,16,20,0))
-    (2, 8, 20, 57, datetime.timedelta(2, 32400), 57)
-    >>> tariff = Tariff.create(['1', 'Час 1 грн.', '1', '1', '1', 'None', '10', 'None'])
-    >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,16,20,0))
-    (2, 8, 20, 57, datetime.timedelta(2, 32400), 29)
-    """
-
-    def __init__(self, fields):
-        Tariff.__init__(self, fields)
+    def __init__(self, fields, **kw):
+        Tariff.__init__(self, fields, **kw)
         self.result_class = FixedTariffResult
 
     def calc_basis(self, begin, end):
@@ -372,7 +309,7 @@ class FixedTariff(Tariff):
         if pivot < begin:
             pivot += timedelta(days=1)
         _, units = self.calc_units(pivot, end)
-        extra_units = 1 if (pivot - begin).total_seconds() > Tariff.FREE_TIME else 0
+        extra_units = 1 if (pivot - begin).total_seconds() > self.free_time else 0
         return FixedTariffResult(self, end - begin, units, extra_time=pivot - begin, extra_units=extra_units)
 
         #if pivot > end:
@@ -417,25 +354,9 @@ class DynamicTariffResult(TicketTariffResult):
 class DynamicTariff(Tariff):
     """
     This tariff can only have hour interval.
-    >>> tariff = Tariff.create(['2', '', '2', '1', ' '.join(str(i) for i in range(1,25)), 'None', 'None', 'None'])
-    >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,10,0))
-    (0, 0, 10, 0, datetime.timedelta(0, 600), 0)
-    >>> tariff.calc(datetime(2013,10,28,11,0,0), datetime(2013,10,28,11,45,0))
-    (0, 0, 45, 1, datetime.timedelta(0, 3600), 1)
-    >>> tariff.calc(datetime(2013,10,28,9,0,0), datetime(2013,10,28,14,45,0))
-    (0, 5, 45, 6, datetime.timedelta(0, 21600), 21)
-    >>> tariff = Tariff.create(['2', '', '2', '1', ' '.join(str(i) for i in range(1,25)), 'None', 'None', 'None'])
-    >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,11,10,0))
-    (2, 3, 10, 51, datetime.timedelta(2, 11400), 606)
-    >>> tariff = Tariff.create(['2', '', '2', '1', ' '.join(str(i) for i in range(1,25)), 'None', '100', 'None'])
-    >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,16,20,0))
-    (2, 8, 20, 57, datetime.timedelta(2, 32400), 245)
-    >>> tariff = Tariff.create(['2', '', '2', '1', ' '.join(str(i) for i in range(1,25)), 'None', '10', 'None'])
-    >>> tariff.calc(datetime(2013,10,26,8,0,0), datetime(2013,10,28,16,20,0))
-    (2, 8, 20, 57, datetime.timedelta(2, 32400), 30)
     """
-    def __init__(self, fields):
-        Tariff.__init__(self, fields)
+    def __init__(self, fields, **kw):
+        Tariff.__init__(self, fields, **kw)
         if self.interval != Tariff.HOURLY:
             raise ValueError("DynamicTariff can only be hourly.")
 
@@ -445,8 +366,8 @@ class DynamicTariff(Tariff):
 
 @Tariff.register(Tariff.ONCE)
 class OnceTariff(Tariff):
-    def __init__(self, fields):
-        Tariff.__init__(self, fields)
+    def __init__(self, fields, **kw):
+        Tariff.__init__(self, fields, **kw)
 
 
 class CardTariffResult(object):
@@ -502,8 +423,8 @@ class SubscriptionTariff(Tariff):
     >>> B.begin == month_begin, B.end == month_end + timedelta(days=days_in_month(month_end + timedelta(days=1)))
     (True, True)
     """
-    def __init__(self, fields):
-        Tariff.__init__(self, fields)
+    def __init__(self, fields, **kw):
+        Tariff.__init__(self, fields, **kw)
 
     def calc(self, begin, end):
         today = date.today()
@@ -543,8 +464,8 @@ class PrepaidTariff(Tariff):
     >>> B.begin == month_begin, B.end == month_end, B.units == (month_end - today).days + 1
     (True, True, True)
     """
-    def __init__(self, fields):
-        Tariff.__init__(self, fields)
+    def __init__(self, fields, **kw):
+        Tariff.__init__(self, fields, **kw)
 
     def calc(self, begin, end):
         today = date.today()
