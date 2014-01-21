@@ -60,7 +60,7 @@ class TicketInput(QDialog):
     def bar_changed(self, bar):
         bar = str(bar)
         try:
-            assert(len(bar) == 18)
+            assert(len(bar) == Ticket.BAR_LENGTH)
             Ticket.parse_bar(bar)
             self.ui.ok.setEnabled(True)
             self.ui.bar.setStyleSheet('background-color: #bbffbb')

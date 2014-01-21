@@ -29,8 +29,8 @@ class LoginDialog(QDialog):
 
     @staticmethod
     def generate_info(card):
-        return _('Card %(sn)s\n%(fio)s\n') % {
-            'sn': card.sn,
+        return _('Card #%(id)s\n%(fio)s\n') % {
+            'id': card.id,
             'fio': card.fio
         }
 
@@ -72,8 +72,8 @@ class LogoffDialog(QDialog):
     @staticmethod
     def generate_info(card, report=None):
         report = unicode(report) if report else _('Report generation...')
-        return _('Card %(sn)s\n%(fio)s\n\n%(report)s') % {
-            'sn': card.sn,
+        return _('Card #%(id)s\n%(fio)s\n\n%(report)s') % {
+            'id': card.id,
             'fio': card.fio,
             'report': report
         }

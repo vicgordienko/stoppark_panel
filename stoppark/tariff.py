@@ -6,9 +6,9 @@ from calendar import monthrange
 from itertools import cycle, izip
 from config import DATE_USER_FORMAT
 from i18n import language
+
 _ = language.ugettext
 _n = language.ungettext
-
 
 _n('unit_', 'units_', 1)
 _n('hour_', 'hours_', 1)
@@ -19,7 +19,6 @@ _n('unit', 'units', 1)
 _n('hour', 'hours', 1)
 _n('day', 'days', 1)
 _n('month', 'months', 1)
-
 
 DEFAULT_FREE_TIME = 15
 
@@ -34,9 +33,9 @@ class Tariff(QObject):
     MONTHLY = 3
 
     DIVISORS = {
-        HOURLY: 60*60,
-        DAILY: 60*60*24,
-        MONTHLY: 60*60*24*30  # TODO: sad, but month is not a fixed-time interval in our calendar
+        HOURLY: 60 * 60,
+        DAILY: 60 * 60 * 24,
+        MONTHLY: 60 * 60 * 24 * 30  # TODO: sad, but month is not a fixed-time interval in our calendar
     }
 
     FIXED = 1
@@ -54,9 +53,11 @@ class Tariff(QObject):
         @param identifier: int, key to identify classes for this decorator
         @return: decorator for Tariff-based class
         """
+
         def wrapper(cls):
             Tariff.TYPES[identifier] = cls
             return cls
+
         return wrapper
 
     @staticmethod
@@ -75,7 +76,7 @@ class Tariff(QObject):
             free_time = DEFAULT_FREE_TIME
         free_time *= 60
         try:
-            assert(len(response) >= 8)
+            assert (len(response) >= 8)
             return Tariff.TYPES[int(response[2])](response, free_time=free_time)
         except (TypeError, AssertionError, IndexError, ValueError, KeyError) as e:
             return None
@@ -209,7 +210,7 @@ class Tariff(QObject):
 
     @property
     def cost_db(self):
-        return str(self.cost*100) if isinstance(self.cost, int) else ''
+        return str(self.cost * 100) if isinstance(self.cost, int) else ''
 
     @pyqtProperty(str, constant=True)
     def zero_time_info(self):
@@ -228,6 +229,7 @@ class TicketTariffResult(object):
     This is a base class for ticket tariff results
     It provides common methods and properties shared between its descendants.
     """
+
     def __init__(self):
         self.days = None
         self.hours = None
@@ -251,9 +253,9 @@ class TicketTariffResult(object):
     def __unicode__(self):
         return _('Duration: %(duration)s.\n'
                  'Payment units: %(units)i') % {
-                     'duration': self.duration,
-                     'units': self.units
-                 }
+                   'duration': self.duration,
+                   'units': self.units
+               }
 
     def state(self):
         return self.days, self.hours, self.minutes, self.units, self.paid_time, self.price
@@ -263,7 +265,7 @@ class TicketTariffResult(object):
 
 
 class FixedTariffResult(TicketTariffResult):
-    def __init__(self, tariff,  delta, units, extra_time=None, extra_units=None):
+    def __init__(self, tariff, delta, units, extra_time=None, extra_units=None):
         """
         @param tariff: mandatory, Tariff
         @param delta: mandatory, datetime.timedelta
@@ -290,9 +292,9 @@ class FixedTariffResult(TicketTariffResult):
 
         self.price = self.units * tariff.cost
         if tariff.interval == Tariff.HOURLY and tariff.max_per_day is not None and self.price > tariff.max_per_day:
-            cost_per_day = min(tariff.max_per_day, tariff.cost*24)
+            cost_per_day = min(tariff.max_per_day, tariff.cost * 24)
             self.price = cost_per_day * (self.units / 24)
-            self.price += min((self.units % 24)*tariff.cost, tariff.max_per_day)
+            self.price += min((self.units % 24) * tariff.cost, tariff.max_per_day)
 
 
 @Tariff.register(Tariff.FIXED)
@@ -304,19 +306,21 @@ class FixedTariff(Tariff):
     def calc_basis(self, begin, end):
         return FixedTariffResult(self, *self.calc_units(begin, end))
 
+    def calc_daily_zero_time_extra(self, begin, end, pivot):
+        return {
+            'extra_time': pivot - begin,
+            'extra_units': 1
+        } if all((
+            (end - begin).total_seconds() > self.free_time,
+            (pivot - begin).total_seconds() > self.free_time
+        )) else {}
+
     def calc_daily_zero_time(self, begin, end):
         pivot = begin.replace(hour=self.zero_time[0], minute=self.zero_time[1], second=0)
         if pivot < begin:
             pivot += timedelta(days=1)
         _, units = self.calc_units(pivot, end)
-        extra_units = 1 if (pivot - begin).total_seconds() > self.free_time else 0
-        return FixedTariffResult(self, end - begin, units, extra_time=pivot - begin, extra_units=extra_units)
-
-        #if pivot > end:
-        #    return self.calc_basis(begin, end)
-        #unit_diff = 1 if (pivot - begin).total_seconds() > self.FREE_TIME else 0
-        #_, units = self.calc_units(pivot, end)
-        #return FixedTariffResult(self, end - begin, units + unit_diff)
+        return FixedTariffResult(self, end - begin, units, **self.calc_daily_zero_time_extra(begin, end, pivot))
 
     def calc(self, begin, end):
         if self.interval == Tariff.DAILY and self.zero_time:
@@ -355,6 +359,7 @@ class DynamicTariff(Tariff):
     """
     This tariff can only have hour interval.
     """
+
     def __init__(self, fields, **kw):
         Tariff.__init__(self, fields, **kw)
         if self.interval != Tariff.HOURLY:
@@ -375,6 +380,7 @@ class CardTariffResult(object):
     Generally applicable card tariff result.
     Can be used with both Subscription and Prepaid tariffs.
     """
+
     def __init__(self, begin, end, cost, units=1):
         self.begin = begin
         self.end = end
@@ -423,6 +429,7 @@ class SubscriptionTariff(Tariff):
     >>> B.begin == month_begin, B.end == month_end + timedelta(days=days_in_month(month_end + timedelta(days=1)))
     (True, True)
     """
+
     def __init__(self, fields, **kw):
         Tariff.__init__(self, fields, **kw)
 
@@ -464,6 +471,7 @@ class PrepaidTariff(Tariff):
     >>> B.begin == month_begin, B.end == month_end, B.units == (month_end - today).days + 1
     (True, True, True)
     """
+
     def __init__(self, fields, **kw):
         Tariff.__init__(self, fields, **kw)
 
@@ -477,7 +485,9 @@ class PrepaidTariff(Tariff):
             units = days_in_month(today) - today.day
             return CardTariffResult(today, today + timedelta(days=units), self.cost, units + 1)
 
+
 if __name__ == '__main__':
     import doctest
+
     doctest.testmod()
 

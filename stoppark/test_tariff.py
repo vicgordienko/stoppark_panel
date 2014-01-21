@@ -94,6 +94,15 @@ class TestFixedTariff(TestCase):
 
     def test_fixed_daily_with_zero_time(self):
         tariff = Tariff.create(['1', 'Special daily tariff', '1', '2', '100', '09:00', 'None', 'None'])
+
+        # Free time in action
+        self.assertEqual(tariff.calc(datetime(2013, 10, 1, 12, 0, 0), datetime(2013, 10, 1, 12, 10, 0)).state(),
+                         (0, 0, 10, 0, timedelta(0, 600), 0))
+        self.assertEqual(tariff.calc(datetime(2013, 10, 1, 8, 50, 0), datetime(2013, 10, 1, 9, 10, 0)).state(),
+                         (0, 0, 20, 0, timedelta(0, 1200), 0))
+        self.assertEqual(tariff.calc(datetime(2013, 10, 1, 8, 50, 0), datetime(2013, 10, 2, 9, 10, 0)).state(),
+                         (1, 0, 20, 1, timedelta(1, 1200), 100))
+
         self.assertEqual(tariff.calc(datetime(2013, 10, 1, 9, 0, 0), datetime(2013, 10, 2, 9, 0, 0)).state(),
                          (1, 0, 0, 1, timedelta(1, 0), 100))
         self.assertEqual(tariff.calc(datetime(2013, 10, 1, 8, 0, 0), datetime(2013, 10, 2, 9, 0, 0)).state(),

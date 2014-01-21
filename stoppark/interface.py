@@ -156,8 +156,8 @@ class TerminalEntries(Structure):
 
 class TerminalState(DumpableStructure):
     _fields_ = [
-        ('reason', c_uint8),
         ('command', c_uint8),
+        ('reason', c_uint8),
     ]
 
     reasons = {'not': 0, 'man': 1, 'prepay': 2, 'talon': 3, 'staff': 4, 'auto': 5}
@@ -223,7 +223,8 @@ class TerminalReader(DumpableStructure):
             mainloop.notify.emit(_('Card at terminal'), u'%s' % (card_info,))
             if card and card.check(direction):
                 mainloop.notify.emit(_('Access permitted.'), u'%s' % (card_info,))
-                TerminalState('man', 'in_open').set(terminal, addr, mainloop.db)
+                command = 'out_open' if direction else 'in_open'
+                TerminalState('auto', command).set(terminal, addr, mainloop.db)
                 TerminalMessage(_('Access permitted.')).set(terminal, addr)
             else:
                 mainloop.notify.emit(_('Access denied.'), u'%s' % (card_info,))
@@ -256,7 +257,7 @@ class TerminalReaders(Structure):
     def process(self, terminal, mainloop):
         ret = terminal_get_readers(terminal, self.addr, self)
 
-        direction = self.addr % 2
+        direction = self.addr % 2  # direction is 0 for moving in and 1 for moving out
         if (direction == 0 and ret != 0xe0c18de) or (direction == 1 and ret != 0):
             return False
 
@@ -295,7 +296,7 @@ class TerminalBarcode(DumpableStructure):
             ticket = mainloop.db.get_ticket(self.code)
             if ticket and ticket.check():
                 mainloop.notify.emit(_('BAR Access permitted.'), u'%s' % (ticket.bar,))
-                TerminalState('man', 'out_open').set(terminal, self.addr, mainloop.db)
+                TerminalState('auto', 'out_open').set(terminal, self.addr, mainloop.db)
                 TerminalMessage(_('BAR Access permitted.')).set(terminal, self.addr)
             else:
                 mainloop.notify.emit(_('BAR Access denied.'), u'%s' % (ticket.bar,))

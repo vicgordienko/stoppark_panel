@@ -223,6 +223,8 @@ class TicketPaymentUndefined(Payment):
 
 
 class Ticket(QObject):
+    BAR_LENGTH = 18
+
     IN = 1
     PAID = 5
     OUT = 15
@@ -254,6 +256,10 @@ class Ticket(QObject):
         @param bar: string, barcode from barcode reader
         @return: datetime.datetime, datetime of ticket moving inside
         """
+        if len(bar) != Ticket.BAR_LENGTH:
+            raise ValueError
+        if sum(ord(i) - ord('0') for i in bar[:-2]) & 0xFF != int(bar[-2:]):
+            raise ValueError
         try:
             probable_date = datetime.strptime(str(datetime.now().year) + bar[:10], '%Y%m%d%H%M%S')
             if probable_date > datetime.now():

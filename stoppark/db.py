@@ -306,25 +306,29 @@ class DB(QObject):
                 print 'Incorrect response:', e.__class__.__name__, e
         return free_places
 
-    reasons = {1: 'вручную', 5: 'автоматически'}
+    reasons = {
+        1: _('manual').encode('utf8', errors='replace'),
+        5: _('auto').encode('utf8', errors='replace')
+    }
 
     def generate_open_event(self, addr, reason, command):
         if not command % 2:
+            # close commands do not trigger event generation
             return True
 
         reason = self.reasons.get(reason, '')
-        event_name = 'открытие' if command % 2 else ''
+        event_name = _('open').encode('utf8', errors='replace') if command % 2 else ''
         now = datetime.now().strftime(DATETIME_FORMAT)
 
         args = (event_name, now, addr, reason)
         return self.query('insert into events values("Event",NULL,"%s","%s",%i,"","%s",'
                           '(select placefree from gstatus),"","")' % args, local=True)
 
-    PASS_QUERY = ('insert into events values("Event",NULL,"проезд","%s",%i,"%s","",'
-                  '(select placefree from gstatus),%s,"")')
+    PASS_QUERY = ('insert into events values("Event",NULL,"{0}","%s",%i,"%s","",'
+                  '(select placefree from gstatus),%s,"")'.format(_('pass').encode('utf8', errors='replace')))
 
     def generate_pass_event(self, addr, inside, sn=None):
-        direction_name = 'внутрь' if inside else 'наружу'
+        direction_name = (_('inside') if inside else _('outside')).encode('utf8', errors='replace')
         now = datetime.now().strftime(DATETIME_FORMAT)
         args = (now, addr, direction_name, '"%s"' % (sn,) if sn else 'null')
 

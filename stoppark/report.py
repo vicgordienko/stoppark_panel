@@ -2,17 +2,17 @@
 from datetime import datetime
 from config import DATETIME_FORMAT_USER, LOCAL_DATETIME_FORMAT
 from i18n import language
+
 _ = language.ugettext
 
 
 class Report(object):
-
     def __init__(self, db):
         self.db = db
         self.begin = '?'
         session = self.db.local.session()
         if session is not None:
-            _, _, self.begin, _ = session
+            sn, operator, self.begin, end = session
             try:
                 self.begin = datetime.strptime(self.begin, LOCAL_DATETIME_FORMAT).strftime(DATETIME_FORMAT_USER)
             except ValueError:
@@ -25,12 +25,21 @@ class Report(object):
         self.sum = db.local.query('select sum(summa)/100 from payment')[0][0]
         if self.sum is None:
             self.sum = 0
-        self.moved_in = db.local.query('select count(*) from events where Direction="внутрь" and EventName="проезд"')[0][0]
+        moved_in_query = ('select count(*) from events '
+                          'where Direction="%s" and EventName="%s"' %
+                          (_('inside').encode('utf8', errors='replace'),
+                           _('pass').encode('utf8', errors='replace')))
+        self.moved_in = db.local.query(moved_in_query)[0][0]
         self.moved_out = db.local.query('select count(*) from events '
-                                        'where Direction="наружу" and EventName="проезд"')[0][0]
+                                        'where Direction="%s" and EventName="%s"' %
+                                        (_('outside').encode('utf8', errors='replace'),
+                                         _('pass').encode('utf8', errors='replace')))[0][0]
         self.card_moved_out = db.local.query('select count(*) from events '
-                                             'where Direction="наружу" and EventName="проезд"'
-                                             'and Card is not null')[0][0]
+                                             'where Direction="%s" and EventName="%s"'
+                                             'and Card is not null' %
+                                             (_('outside').encode('utf8', errors='replace'),
+                                              _('pass').encode('utf8', errors='replace')))[0][0]
+        self.moved_out -= self.card_moved_out  # information about cards moving out is doubled in database
         self.ticket_moved_out = self.moved_out - self.card_moved_out
 
     def __unicode__(self):
@@ -55,23 +64,24 @@ class Report(object):
 
         return (self.header +
                 _('<c><s>Report on period</s></c>\n'
-                 '\n'
-                 'from {self.begin}\n'
-                 'to {now}\n'
-                 'all places: {self.total_places}\n'
-                 '      free: {self.free_places}\n'
-                 '        in: {self.moved_in}\n'
-                 '       out: {self.moved_out}\n'
-                 '   tickets: {self.ticket_moved_out}\n'
-                 '     cards: {self.card_moved_out}\n'
-                 '\n'
-                 '       Sum: {self.sum}\n'
-                 '\n').format(self=self, now=datetime.now().strftime(DATETIME_FORMAT_USER)) +
+                  '\n'
+                  'from {self.begin}\n'
+                  'to {now}\n'
+                  'all places: {self.total_places}\n'
+                  '      free: {self.free_places}\n'
+                  '        in: {self.moved_in}\n'
+                  '       out: {self.moved_out}\n'
+                  '   tickets: {self.ticket_moved_out}\n'
+                  '     cards: {self.card_moved_out}\n'
+                  '\n'
+                  '       Sum: {self.sum}\n'
+                  '\n').format(self=self, now=datetime.now().strftime(DATETIME_FORMAT_USER)) +
                 footer + u'\n<hr />')
 
 
 if __name__ == '__main__':
     import doctest
+
     doctest.testmod()
 
 

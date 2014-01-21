@@ -353,7 +353,7 @@ class Payments(QWidget):
             login_dialog = LoginDialog(card, parent=self)
             if login_dialog.exec_() == QDialog.Accepted:
                 return self.reader.begin_session(card)
-        elif self.session == card.sn or card.type == Card.ADMIN:
+        elif self.session == card.sn or (self.session is not None and card.type == Card.ADMIN):
             login_dialog = LogoffDialog(card, self.reader)
             if login_dialog.exec_() == QDialog.Accepted:
                 return self.reader.end_session()

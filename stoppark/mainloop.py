@@ -92,10 +92,10 @@ class Mainloop(QObject):
         self.queue.put(lambda terminal: TerminalCounters(self.db).set(terminal, addr))
 
     def terminal_open(self, addr):
-        self.queue.put(lambda terminal: TerminalState('man', 'in_open').set(terminal, addr, self.db))
+        self.queue.put(lambda terminal: TerminalState('man', 'open').set(terminal, addr, self.db))
 
     def terminal_close(self, addr):
-        self.queue.put(lambda terminal: TerminalState('man', 'in_close').set(terminal, addr, self.db))
+        self.queue.put(lambda terminal: TerminalState('man', 'close').set(terminal, addr, self.db))
 
 if __name__ == '__main__':
     m = Mainloop([0, 1, 2, 3])

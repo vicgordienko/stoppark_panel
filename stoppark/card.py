@@ -33,8 +33,8 @@ class CardPayment(Payment):
 
     @pyqtProperty(str, constant=True)
     def explanation(self):
-        base = _('Card %(sn)s (%(status)s)\n'
-                 '%(fio)s.\n'
+        base = _('%(fio)s.\n'
+                 '[%(make)s] [%(number)s] [%(status)s]\n'
                  'Valid from %(begin)s to %(end)s\n') % {
                      'sn': self.card.sn,
                      'status': {
@@ -43,7 +43,9 @@ class CardPayment(Payment):
                      }.get(self.card.status, _('unknown status')),
                      'fio': self.card.fio,
                      'begin':  self.card.date_reg.strftime(DATE_USER_FORMAT),
-                     'end': self.card.date_end.strftime(DATE_USER_FORMAT)
+                     'end': self.card.date_end.strftime(DATE_USER_FORMAT),
+                     'make': self.card.make,
+                     'number': self.card.number
                  }
 
         if self._enabled:
@@ -177,7 +179,7 @@ class Card(QObject):
 
         self.fields = fields
 
-        self.id = fields[1]
+        self.id = int(fields[1])
         self.type = int(fields[2])
         self.sn = fields[3]
         self.date_reg = self.parse_date(fields[4])
@@ -188,8 +190,8 @@ class Card(QObject):
         self.drive_sname = fields[9]
         self.drive_fname = fields[10]
         self.drive_phone = fields[11]
-        self.number = fields[12]
-        self.model = fields[13]
+        self.number = fields[12].decode('utf8', errors='replace') if fields[12] != 'None' else u'?'
+        self.make = fields[13].decode('utf8', errors='replace') if fields[13] != 'None' else u'?'
         self.color = fields[14]
         self.status = int(fields[15])
         self.tariff_type = int(fields[16]) if fields[16] != 'None' else None

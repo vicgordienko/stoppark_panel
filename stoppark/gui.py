@@ -3,6 +3,7 @@ from PyQt4 import uic
 from PyQt4.QtGui import QWidget, QApplication
 from db import LocalDB
 from i18n import language
+
 _ = language.ugettext
 
 
@@ -48,8 +49,7 @@ class Main(QWidget):
         self.ui.leftUp.setEnabled(not not self.left_terminals)
         self.ui.leftDown.setEnabled(not not self.left_terminals)
 
-        self.right_terminals = \
-            self.db.get_terminals_id_by_option('right')
+        self.right_terminals = self.db.get_terminals_id_by_option('right')
         self.ui.rightUp.setEnabled(not not self.right_terminals)
         self.ui.rightDown.setEnabled(not not self.right_terminals)
 
@@ -93,6 +93,7 @@ class Main(QWidget):
 if __name__ == '__main__':
     import sys
     import config
+
     config.setup_logging()
 
     app = QApplication(sys.argv)
