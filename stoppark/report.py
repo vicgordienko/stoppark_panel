@@ -12,7 +12,7 @@ class Report(object):
         self.begin = '?'
         session = self.db.local.session()
         if session is not None:
-            sn, operator, self.begin, end = session
+            sn, operator, access, self.begin, end = session
             try:
                 self.begin = datetime.strptime(self.begin, LOCAL_DATETIME_FORMAT).strftime(DATETIME_FORMAT_USER)
             except ValueError:

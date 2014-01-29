@@ -4,6 +4,13 @@ from PyQt4.QtGui import QDialog
 from i18n import language
 _ = language.ugettext
 
+ACCESS_STRINGS = {
+    'admin': _('Admin'),
+    'operator': _('Operator'),
+    'config': _('Config'),
+    'none': _('GTFO')
+}
+
 
 class LoginDialog(QDialog):
     def __init__(self, card, parent=None):
@@ -29,17 +36,18 @@ class LoginDialog(QDialog):
 
     @staticmethod
     def generate_info(card):
-        return _('Card #%(id)s\n%(fio)s\n') % {
+        return _('Card #%(id)s\n%(fio)s\nAccess: %(access)s\n') % {
             'id': card.id,
-            'fio': card.fio
+            'fio': card.fio,
+            'access': ACCESS_STRINGS[card.access]
         }
 
 
 class LogoffDialog(QDialog):
-    def __init__(self, card, reader, parent=None):
+    def __init__(self, card, executor, parent=None):
         QDialog.__init__(self, parent)
 
-        self.reader = reader
+        self.executor = executor
         self.card = card
         self.report = None
 
@@ -47,15 +55,15 @@ class LogoffDialog(QDialog):
         self.ui.setupUi(self)
         self.localize()
 
+        self.ui.yes.setEnabled(False)
         self.ui.print_check.setVisible(False)
         self.ui.info.setText(self.generate_info(card))
 
-        self.ui.yes.clicked.connect(self.accept_logoff)
         self.ui.no.clicked.connect(self.reject)
 
-        self.reader.report.connect(self.handle_report)
         self.ui.print_check.clicked.connect(self.print_check)
-        self.reader.generate_report()
+        self.executor.report.connect(self.handle_report)
+        self.executor.generate_report()
 
     def localize(self):
         self.setWindowTitle(_('Session end'))
@@ -66,26 +74,30 @@ class LogoffDialog(QDialog):
         self.ui.no.setText(_('No'))
 
     def accept_logoff(self):
-        self.reader.to_printer(self.report.check(cashier=self.card.fio_short))
+        self.executor.to_printer(self.report.check(cashier=self.card.fio_short))
         self.accept()
 
     @staticmethod
     def generate_info(card, report=None):
         report = unicode(report) if report else _('Report generation...')
-        return _('Card #%(id)s\n%(fio)s\n\n%(report)s') % {
+        return _('Card #%(id)s\n%(fio)s\nAccess: %(access)s\n\n%(report)s') % {
             'id': card.id,
             'fio': card.fio,
-            'report': report
+            'report': report,
+            'access': ACCESS_STRINGS[card.access]
         }
 
     def print_check(self):
-        self.reader.to_printer(self.report.check())
+        self.executor.to_printer(self.report.check())
 
     def handle_report(self, report):
         print 'handle_report', report
         self.ui.progress.setVisible(False)
-        self.reader.report.disconnect(self.handle_report)
+        self.executor.report.disconnect(self.handle_report)
 
         self.report = report
         self.ui.info.setText(self.generate_info(self.card, self.report))
         self.ui.print_check.setVisible(True)
+
+        self.ui.yes.setEnabled(True)
+        self.ui.yes.clicked.connect(self.accept_logoff)

@@ -76,8 +76,8 @@ class CardPayment(Payment):
             'price': self.result.price
         }
 
-    CARD_QUERY = 'update card set DTreg="%s",DTend="%s", TarifType=%i, TarifPrice=%i*100, TarifSumm=%i*100 ' \
-                 'where CardID="%s"'
+    CARD_QUERY = ('update card set DTreg="%s",DTend="%s", TarifType=%i, TarifPrice=%i*100, TarifSumm=%i*100 '
+                  'where CardID="%s"')
 
     def execute(self, db):
         args = (self.result.begin.strftime(DATE_FORMAT), self.result.end.strftime(DATE_FORMAT),
@@ -140,6 +140,7 @@ class Card(QObject):
     CLIENT = 2
     CASHIER = 3
     ADMIN = 4
+    CONFIG = 0xFF
 
     ALLOWED_TYPE = [ONCE, CLIENT, STAFF]
 
@@ -156,13 +157,13 @@ class Card(QObject):
     ]
 
     @staticmethod
-    def create(response):
+    def create(response, apb=False):
         if response is False:
             return False
         try:
             fields = response[0]
             assert(len(fields) >= 19)
-            return Card(fields)
+            return Card(fields, apb=apb)
         except (TypeError, AssertionError, IndexError, ValueError):
             return None
 
@@ -173,8 +174,17 @@ class Card(QObject):
         except ValueError:
             return None
 
-    def __init__(self, fields):
+    @staticmethod
+    def config_card():
+        return Card([
+            'Card', '-1', str(Card.CONFIG), '',
+            datetime.now().strftime(DATE_FORMAT), datetime.now().strftime(DATE_FORMAT),
+            'None', 'None', '', 'Config', '', 'None', 'None', 'None', 'None', '0', '-1', 'None', 'None'
+        ])
+
+    def __init__(self, fields, apb=False):
         QObject.__init__(self)
+        self.apb = apb
         self.payments = []
 
         self.fields = fields
@@ -201,7 +211,7 @@ class Card(QObject):
     def check(self, direction):
         if self.type not in self.ALLOWED_TYPE:
             return False
-        if self.status not in self.ALLOWED_STATUS[direction]:
+        if self.apb and self.status not in self.ALLOWED_STATUS[direction]:
             return False
 
         if self.date_reg is None or self.date_end is None:
@@ -220,6 +230,14 @@ class Card(QObject):
     def fio(self):
         return ('%s %s %s' % (self.drive_fname, self.drive_name, self.drive_sname)).decode('utf8', errors='replace')
 
+    @pyqtProperty(str, constant=True)
+    def access(self):
+        return {
+            Card.ADMIN: 'admin',
+            Card.CASHIER: 'operator',
+            Card.CONFIG: 'config'
+        }.get(self.type, 'none')
+
     @pyqtProperty(int, constant=True)
     def tariff(self):
         return self.tariff_type
@@ -227,13 +245,13 @@ class Card(QObject):
     @pyqtProperty(str, constant=True)
     def fio_short(self):
         return u'%s %s.%s.' % (self.drive_fname.decode('utf8', errors='replace'),
-                               self.drive_name.decode('utf8', errors='replace')[0],
-                               self.drive_sname.decode('utf8', errors='replace')[0])
+                               self.drive_name.decode('utf8', errors='replace')[0:1],
+                               self.drive_sname.decode('utf8', errors='replace')[0:1])
 
     def moved(self, db, addr, inside):
         status = Card.INSIDE if inside else Card.OUTSIDE
         datetime_update = ('DTIn = "%s"' if inside else 'DTOut = "%s"') % (datetime.now().strftime(DATETIME_FORMAT))
-        db.query('update card set status = %i, %s where cardid = \"%s\"' % (status, datetime_update, self.sn))
+        db.query('update card set status = %i, %s where CardID = "%s"' % (status, datetime_update, self.sn))
         return db.generate_pass_event(addr, inside, self.sn)
 
 

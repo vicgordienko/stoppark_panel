@@ -1,3 +1,4 @@
+import sys
 from subprocess import Popen
 from PyQt4 import uic
 from PyQt4.QtGui import QLineEdit, QDialog
@@ -15,8 +16,8 @@ class Keyboard(object):
             if cls.keyboard.poll() is None:
                 return
         if layout is None:
-            layout = 'digits'
-        cls.keyboard = Popen(['matchbox-keyboard', '-g', '80x0', layout])
+            layout = ['-g', '80x0', 'digits']
+        cls.keyboard = Popen(['matchbox-keyboard'] + layout)
 
 
 class TouchLineEdit(QLineEdit):
@@ -50,7 +51,7 @@ class TicketInput(QDialog):
         self.ui.cancel.setText(_('Cancel'))
 
     def show_keyboard(self):
-        Keyboard.show('digits')
+        Keyboard.show()
         self.ui.bar.setFocus(True)
 
     @property

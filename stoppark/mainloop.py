@@ -24,6 +24,7 @@ def device_loop(terminal, mainloop, addr):
 
 class Mainloop(QObject):
     ready = pyqtSignal(bool, dict)
+    stopped = pyqtSignal()
     report = pyqtSignal(int, str)
     state = pyqtSignal(int, str)
     notify = pyqtSignal(str, str)
@@ -71,16 +72,17 @@ class Mainloop(QObject):
 
         terminal.close()
         self.queue = None
-        print 'Mainloop completed'
+        self.stopped.emit()
 
     def start(self):
         self.thread = Thread(target=self._mainloop)
         self.thread.start()
 
-    def stop(self):
+    def stop(self, block=False):
         if self.queue:
             self.queue.put(None)
-            self.thread.join()
+            if block:
+                self.thread.join()
 
     def test_display(self):
         test_message = u'Тестовое сообщение'

@@ -108,10 +108,10 @@ class TerminalWidget(QWidget):
 
 
 class TerminalDelegate(QStyledItemDelegate):
-    def __init__(self, mainloop, titles, parent=None):
+    def __init__(self, mainloop, terminals, parent=None):
         QStyledItemDelegate.__init__(self, parent)
         self.mainloop = mainloop
-        self.titles = titles
+        self.terminals = terminals
         self.editors = {}
 
     def report(self, addr, message):
@@ -126,7 +126,7 @@ class TerminalDelegate(QStyledItemDelegate):
     #noinspection PyPep8Naming
     def createEditor(self, parent, option, index):
         addr = index.model().data(index, Qt.EditRole).toInt()[0]
-        editor = TerminalWidget(self.mainloop, addr, self.titles[addr], parent=parent)
+        editor = TerminalWidget(self.mainloop, addr, self.terminals[addr][0], parent=parent)
         self.editors[addr] = editor
         return editor
 
@@ -151,6 +151,7 @@ class Terminals(QWidget):
         self.notifier = QSystemTrayIcon(QIcon('arrow-up-icon.png'), self)
         self.notifier.show()
 
+        self.session = None
         self.model = None
         self.mainloop = None
         self.delegate = None
@@ -171,36 +172,49 @@ class Terminals(QWidget):
         if self.mainloop:
             self.mainloop.terminal_close(addr)
 
-    def begin_session(self, fio):
-        self.ui.cashier.setText(fio)
-        self.start_mainloop()
+    def begin_session(self, fio, access):
+        if access in ['operator']:
+            self.ui.cashier.setText(fio)
+            self.session = (fio, access)
+            self.start_mainloop()
+            return True
+        return False
 
-    def end_session(self):
+    def end_session(self, block=False):
         self.ui.cashier.setText(u'')
-        self.stop_mainloop()
+        self.session = None
+        self.stop_mainloop(block)
+        return True
+
+    def on_mainloop_stopped(self):
+        self.mainloop = None
+        if self.session:
+            self.start_mainloop()
 
     def start_mainloop(self):
         if self.mainloop is None:
             self.mainloop = Mainloop(parent=self)
             self.mainloop.ready.connect(self.on_mainloop_ready)
+            self.mainloop.stopped.connect(self.on_mainloop_stopped)
             self.mainloop.notify.connect(lambda title, msg: self.notifier.showMessage(title, msg))
             self.mainloop.start()
 
-    def stop_mainloop(self):
+    def stop_mainloop(self, block=False):
         if self.mainloop:
-            self.mainloop.state.disconnect()
-            self.mainloop.ready.disconnect()
-            self.mainloop.notify.disconnect()
+            try:
+                self.mainloop.state.disconnect()
+                self.mainloop.ready.disconnect()
+                self.mainloop.notify.disconnect()
+            except TypeError:
+                print 'NOTE: mainloop signals disconnect'
 
-            [self.ui.terminals.closePersistentEditor(self.model.index(row, 0))
-             for row in xrange(self.model.rowCount())]
-            self.mainloop.stop()
+            if self.model:
+                [self.ui.terminals.closePersistentEditor(self.model.index(row, 0))
+                 for row in xrange(self.model.rowCount())]
 
-            self.mainloop = None
-
-    def update_model(self):
-        self.stop_mainloop()
-        self.start_mainloop()
+            self.mainloop.stop(block)
+        else:
+            self.ready.emit(False)
 
     def on_mainloop_ready(self, ok, titles):
         if ok:

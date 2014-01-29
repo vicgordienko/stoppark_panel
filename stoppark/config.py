@@ -20,10 +20,18 @@ if sys.platform == 'linux2':
         #{'path': '127.0.0.1:1200', 'impl': 'tcp' },
         #{'path': '/tmp/stream', 'impl': 'unix'},
     ]
+    DISPLAY_PEER = '/tmp/screen'
+    TICKET_PEER = '/tmp/bar'
+    CARD_PEER = '/tmp/card'
+    PRINTER_PEER = '/tmp/printer'
 else:
     u2py.config.reader_path = [
-        {'path': '\\\\.\\COM4', 'baud': 38400, 'parity': 2, 'impl': 'asio-mt'}
+        {'path': '\\\\.\\COM3', 'baud': 38400, 'parity': 2, 'impl': 'asio-mt'}
     ]
+    DISPLAY_PEER = ('127.0.0.1', 1000)
+    TICKET_PEER = ('127.0.0.1', 1001)
+    CARD_PEER = ('127.0.0.1', 1002)
+    PRINTER_PEER = ('127.0.0.1', 1003)
 
 LOCAL_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 DATE_FORMAT = '%y-%m-%d'

@@ -21,6 +21,7 @@ Rectangle {
             return
         }
         payable = new_payable
+        list.currentIndex = -1
         var suggested_tariff_idx = -1;
         for(var i=0;i<tariffs.length;i++) {
             var tariff = tariffs[i]
@@ -41,14 +42,18 @@ Rectangle {
         for(var i=tariffs.length;i<model.count;i++) {
             model.remove(i)
         }
+        console.log(suggested_tariff_idx)
 
         if(suggested_tariff_idx != -1 && suggested_tariff_idx != list.currentIndex) {
-            if(list.currentIndex != -1) {
+            /*if(list.currentIndex != -1) {
                     list.currentItem.state = ''
-            }
+            }*/
             list.currentIndex = suggested_tariff_idx
-            list.currentItem.state = 'Details'
+            //list.currentItem.state = 'Details'
         } else {
+            if(payable.tariff !== undefined) {
+                list.currentIndex = 0
+            }
             emit_current_payment()
         }
     }
@@ -82,7 +87,7 @@ Rectangle {
         width: parent.width - 1
         height: parent.height - 1
 
-        spacing: 5
+        spacing: 3
         clip: true
         focus: true
         orientation: ListView.Vertical
@@ -97,11 +102,11 @@ Rectangle {
         }
 
         highlightRangeMode: ListView.StrictlyEnforceRange
-        highlightFollowsCurrentItem: true
+        /*highlightFollowsCurrentItem: true
         highlight: Rectangle {
             focus: true
         }
-        highlightMoveDuration: 150
+        highlightMoveDuration: 300*/
 
         delegate: Rectangle {
             id: rect
@@ -119,18 +124,18 @@ Rectangle {
             MouseArea {
                 anchors.fill: parent
                 onClicked: {
-                    if(list.currentIndex != -1 && list.currentIndex != index) {
+                    /*if(list.currentIndex != -1 && list.currentIndex != index) {
                         list.currentItem.state = ''
-                    }
+                    }*/
 
                     if(rect.state == 'Details') {
                         list.currentIndex = -1
-                        list.interactive = true
-                        rect.state = ''
+                        //list.interactive = true
+                        //rect.state = ''
                     } else {
                         list.currentIndex = index
-                        list.interactive = false
-                        rect.state = 'Details'
+                        //list.interactive = false
+                        //rect.state = 'Details'
                     }
                 }
             }
@@ -138,17 +143,21 @@ Rectangle {
             states: [
                 State {
                     name: "Details"
-
+                    when: index == list.currentIndex
                     PropertyChanges { target: rect; color: "lightsteelblue" }
-                    PropertyChanges { target: rect; height: list.height - border.width }
+                    PropertyChanges { target: rect; height: list.height }
                     PropertyChanges { target: rect; detailsOpacity: 1 }
+                    StateChangeScript {
+                        name: "myScript"
+                        script: console.log(index,'->', 'details')
+                    }
                 }
             ]
 
             transitions: Transition {
                 ParallelAnimation {
                     ColorAnimation { property: "color"; duration: 300 }
-                    NumberAnimation { duration: 200; properties: "detailsOpacity,x,height,width" }
+                    NumberAnimation { duration: 300; properties: "detailsOpacity,x,height,width" }
                 }
             }
 

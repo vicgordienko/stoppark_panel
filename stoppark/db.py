@@ -9,6 +9,7 @@ from tariff import Tariff
 from config import db_filename, DATETIME_FORMAT
 import sqlite3
 from i18n import language
+import stoppark
 _ = language.ugettext
 
 
@@ -28,12 +29,31 @@ FREE_PLACES_UPDATE_INTERVAL = 5
 
 class LocalDB(object):
     script = """
+    PRAGMA journal_mode=WAL;
+
     create table if not exists terminal (
         id integer primary key,
         title text,
         display integer default 1,
         option text default ''
     );
+
+    create view if not exists terminal_view as select * from terminal;
+
+    create trigger if not exists terminal_view_insert_existing
+    instead of insert on terminal_view
+    when exists (select * from terminal where id = new.id)
+    begin
+        update terminal set title=new.title where id=new.id;
+    end;
+
+    create trigger if not exists terminal_view_insert_new
+    instead of insert on terminal_view
+    when not exists (select * from terminal where id = new.id)
+    begin
+        insert into terminal (id, title) values(new.id, new.title);
+    end;
+
     create table if not exists tariffs (
         id integer primary key,
         name text,
@@ -102,18 +122,40 @@ class LocalDB(object):
         id integer primary key default (null),
         sn text,
         operator text,
+        access text,
         begin text default (datetime(current_timestamp, 'localtime')),
         end text default (null)
     );
+
+    create table if not exists opt (
+        id integer primary key default (null),
+        key text,
+        value text
+    );
     """
 
-    def __init__(self, filename=None):
+    INIT_CONFIG_QUERY = ('insert into config(id,PlaceNum,FreeTime,'
+                         'UserStr1,UserStr2,UserStr3,UserStr4,'
+                         'UserStr5,UserStr6,UserStr7,UserStr8) '
+                         'values(null,100,15,?,?,?,?,?,?,?,?)')
+
+    def __init__(self, filename=None, initialize=False):
+        sqlite3.enable_shared_cache(True)
+
         if filename is None:
             filename = db_filename
+
         self.filename = filename
-        self.conn = sqlite3.connect(self.filename)
+        self.conn = sqlite3.connect(self.filename, isolation_level='DEFERRED')
         self.conn.row_factory = sqlite3.Row
         self.conn.text_factory = str
+
+        self.free_places_update_time = None
+
+        if initialize:
+            self.initialize()
+
+    def initialize(self):
         with self.conn as c:
             c.executescript(LocalDB.script)
 
@@ -127,28 +169,45 @@ class LocalDB(object):
                                     'CAUTION! Do not crumple tickets!\n'
                                     'Ticket loss will be penalized\n'
                                     'EXAMPLE').split(u'\n')
-                c.execute('insert into config(id,PlaceNum,FreeTime,'
-                          'UserStr1,UserStr2,UserStr3,UserStr4,'
-                          'UserStr5,UserStr6,UserStr7,UserStr8)'
-                          ' values(null,100,15,?,?,?,?,?,?,?,?)', default_strings)
+                c.execute(LocalDB.INIT_CONFIG_QUERY, default_strings)
 
-        self.free_places_update_time = None
+        if self.option('db.ip') is None:
+            self.set_option('db.ip', '127.0.0.1')
+
+    def set_option(self, key, value):
+        with self.conn as c:
+            cursor = c.cursor()
+            cursor.execute('update opt set value=? where key=?', (value, key))
+            if cursor.rowcount == 0:
+                c.execute('insert into opt(key,value) values(?,?)', (key, value))
+
+    def option(self, key):
+        with self.conn as c:
+            for row in c.execute('select value from opt where key=?', (key,)):
+                return row[0]
+
+    def all_options(self):
+        with self.conn as c:
+            return c.execute('select key,value from opt')
+
+    def get_db_addr(self):
+        return self.option('db.ip'), 101
 
     def session_begin(self, card):
         with self.conn as c:
-            c.execute('insert into session(sn, operator) values(?,?)', (card.sn, card.fio))
+            c.execute('insert into session(sn, operator, access) values(?,?,?)', (card.sn, card.fio, card.access))
 
-    def session(self, session_id=None):
-        session_id = session_id if session_id is not None else '(select max(id) from session)'
-        session = self.query('select sn,operator,begin,end from session where id=%s' % (session_id,))
-        if session:
-            return session[0]
+    def session(self):
+        with self.conn as c:
+            for row in c.execute('select sn,operator,access,begin,end from session '
+                                 'where id=(select max(id) from session)'):
+                return row
 
     def session_end(self):
         with self.conn as c:
             c.execute('delete from payment')
             c.execute('delete from events')
-            c.execute('update session set end=datetime(current_timestamp, "localtime") '
+            c.execute('update session set end=datetime(current_timestamp, "localtime")'
                       'where id=(select max(id) from session)')
 
     def connection(self):
@@ -160,37 +219,27 @@ class LocalDB(object):
 
     def update_free_places(self, free_places):
         with self.conn as c:
-            c.execute('update gstatus set placefree=?', (free_places,))
+            c.execute('update GStatus set PlaceFree=?', (free_places,))
             self.free_places_update_time = measurement()
 
     def get_free_places(self):
         if self.free_places_update_time is None:
             return 0, False
 
-        return (self.query('select placefree from gstatus')[0][0],
+        return (self.query('select PlaceFree from GStatus')[0][0],
                 measurement() - self.free_places_update_time < FREE_PLACES_UPDATE_INTERVAL)
 
     def update_terminals(self, terminals):
         with self.conn as c:
-            c.executescript('drop table if exists terminal_remote;'
-                            'create table terminal_remote (id integer primary key, title text);')
-            c.executemany('insert into terminal_remote values(?,?)', terminals)
-            c.executescript('delete from terminal where id not in (select id from terminal_remote);'
-                            'insert into terminal(id,title) select id,title from terminal_remote '
-                            'where id not in (select id from terminal);'
-                            'update terminal set title = (select title from terminal_remote where id = terminal.id);'
-                            'drop table terminal_remote;')
-
-    def get_terminals_id_by_option(self, option):
-        return [int(row[0]) for row in self.query('select id from terminal where option = "%s"' % (option,))]
+            c.executemany('insert into terminal_view(id, title) values(?,?)', terminals)
 
     def get_terminals(self):
-        return self.query('select id,title from terminal where display = 1')
+        return self.query('select id,title,option from terminal where display = 1')
 
     def update_tariffs(self, tariffs):
         try:
             with self.conn as c:
-                c.executescript('delete from tariffs')
+                c.execute('delete from tariffs')
                 c.executemany('insert into tariffs values(?,?,?,?,?,?,?,?)', tariffs)
         except sqlite3.OperationalError as e:
             print 'LOCAL DB ERROR', e.__class__.__name__, e
@@ -205,10 +254,10 @@ class LocalDB(object):
 
     def update_config(self, config):
         with self.conn as c:
-            c.execute('update config set Config=?,id=?,PlaceNum=?,FreeTime=?,PayTime=?,'
+            c.execute(('update config set Config=?,id=?,PlaceNum=?,FreeTime=?,PayTime=?,'
                       'TarifName1=?,TarifName2=?,TarifName3=?,TarifName4=?,'
                       'UserStr1=?,UserStr2=?,UserStr3=?,UserStr4=?,'
-                      'UserStr5=?,UserStr6=?,UserStr7=?,UserStr8=?', *config)
+                      'UserStr5=?,UserStr6=?,UserStr7=?,UserStr8=?'), *config)
 
     def get_config_strings(self):
         return [s.decode('utf8') for s in self.query('select UserStr1,UserStr2,UserStr3,UserStr4,'
@@ -226,12 +275,12 @@ class DB(QObject):
 
     STRINGS_UPDATE_INTERVAL = 60  # seconds
 
-    def __init__(self, host='10.0.2.247', port=101, notify=None, parent=None):
+    def __init__(self, notify=None, initialize_local_db=False, parent=None):
         QObject.__init__(self, parent)
 
-        self.addr = (host, port)
+        self.local = LocalDB(initialize=initialize_local_db)
+        self.addr = self.local.get_db_addr()
         self.notify = notify
-        self.local = LocalDB()
 
     @measure
     def query(self, q, local=False):
@@ -267,20 +316,24 @@ class DB(QObject):
         return [line.split('|') for line in answer.split('\n')]
 
     def get_card(self, sn):
-        return Card.create(self.query('select * from card where cardid = "%s"' % (sn,)))
+        apb = self.local.option('apb') == '2'
+        return Card.create(self.query('select * from card where CardID = "%s"' % (sn,)), apb=apb)
 
     def get_ticket(self, bar):
         return Ticket.create(self.query('select * from ticket where bar = "%s"' % (bar,)))
 
     def get_terminals(self):
+        return dict((int(key), (value.decode('utf8', errors='replace'), option))
+                    for key, value, option in self.local.get_terminals())
+
+    def update_terminals(self):
         ret = self.query('select terminal_id,title from terminal')
         if ret:
             self.local.update_terminals(ret)
-        return dict((int(key), value.decode('utf8', errors='replace')) for key, value in self.local.get_terminals())
 
     def get_tariffs(self):
         free_time = self.get_free_time()
-        ret = self.query('select * from tariff')
+        ret = self.query('select * from Tariff')
         if ret:
             self.local.update_tariffs(ret)
         return filter(lambda x: x is not None, [Tariff.create(t, free_time) for t in self.local.get_tariffs()])
@@ -290,14 +343,16 @@ class DB(QObject):
         return int(ret[0][0]) if ret else ret
 
     def update_free_places(self, diff):
-        self.query('update gstatus set placefree = placefree + %i' % (diff,), local=True)
+        self.query('update GStatus set PlaceFree = PlaceFree + %i' % (diff,), local=True)
         free_places, _ = self.local.get_free_places()
         self.free_places_update.emit(free_places)
 
     def get_free_places(self):
         free_places, valid = self.local.get_free_places()
         if not valid:
-            answer = self.query('select placefree from gstatus')
+            answer = self.query('select PlaceFree from GStatus')
+            if answer is False:
+                return free_places
             try:
                 free_places = int(answer[0][0])
                 self.local.update_free_places(free_places)
@@ -313,7 +368,7 @@ class DB(QObject):
 
     def generate_open_event(self, addr, reason, command):
         if not command % 2:
-            # close commands do not trigger event generation
+            # close commands should not trigger event generation
             return True
 
         reason = self.reasons.get(reason, '')
@@ -321,11 +376,11 @@ class DB(QObject):
         now = datetime.now().strftime(DATETIME_FORMAT)
 
         args = (event_name, now, addr, reason)
-        return self.query('insert into events values("Event",NULL,"%s","%s",%i,"","%s",'
-                          '(select placefree from gstatus),"","")' % args, local=True)
+        return self.query('insert into events values("Event",NULL,"%s","%s",%i,"","%s", \
+                          (select PlaceFree from GStatus),"","")' % args, local=True)
 
-    PASS_QUERY = ('insert into events values("Event",NULL,"{0}","%s",%i,"%s","",'
-                  '(select placefree from gstatus),%s,"")'.format(_('pass').encode('utf8', errors='replace')))
+    PASS_QUERY = ('insert into events values("Event",NULL,"{0}","%s",%i,"%s","",\
+                  (select PlaceFree from GStatus),%s,"")'.format(_('pass').encode('utf8', errors='replace')))
 
     def generate_pass_event(self, addr, inside, sn=None):
         direction_name = (_('inside') if inside else _('outside')).encode('utf8', errors='replace')
@@ -335,7 +390,8 @@ class DB(QObject):
         return self.query(self.PASS_QUERY % args, local=True)
 
     def update_config(self):
-        response = self.query('select * from config')
+        self.addr = self.local.get_db_addr()
+        response = self.query('select * from Config')
         if response:
             self.local.update_config(response)
 
@@ -351,8 +407,8 @@ class DB(QObject):
                                   'STOP-Park\n'
                                   '<hr />\n') + u'\n'.join(self.get_config_strings()[:4]) + u'\n<hr /></c>\n'
 
-    PAYMENT_QUERY = 'insert into payment values(NULL, "{payment}", {tariff}, {console}, "{operator}", ' \
-                    ' "{now}", "{id}", {status}, {tariff}, {cost}*100, {units}, "{begin}", "{end}", {price}*100)'
+    PAYMENT_QUERY = 'insert into Payment values(NULL, "{payment}", {tariff}, {console}, "{operator}", \
+                     "{now}", "{id}", {status}, {tariff}, {cost}*100, {units}, "{begin}", "{end}", {price}*100)'
 
     def generate_payment(self, db_payment_args):
         session = self.local.session()
@@ -368,6 +424,11 @@ if __name__ == '__main__':
     doctest.testmod()
 
     d = DB()
+    d.local.session_end()
+    d.local.session_begin(d.get_card('E7008D750C'))
+    #d.local.session_begin(d.get_card('2A00D146C0'))
+
+
     #d.query('delete from ticket')
     #d.query('update ticket set status=5 where bar = "102514265300000029"')
     #d.query('delete from ticket where bar >= "102516091500000030"')
