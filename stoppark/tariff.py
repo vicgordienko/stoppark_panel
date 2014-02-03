@@ -3,7 +3,7 @@ from PyQt4.QtCore import QObject, pyqtProperty, pyqtSlot
 from math import ceil, floor
 from datetime import datetime, timedelta, date
 from calendar import monthrange
-from itertools import cycle, izip
+from itertools import izip
 from config import DATE_USER_FORMAT
 from i18n import language
 
@@ -108,7 +108,7 @@ class Tariff(QObject):
         except ValueError:
             self.cost = [int(i) for i in fields[4].split(' ')]
 
-        if fields[5] != 'None':
+        if fields[5] not in ['None', '24:00']:
             self.zero_time = [int(i, 10) for i in fields[5].split(':')]
             if len(self.zero_time) != 2:
                 raise IndexError("Incorrect zero time: %s" % (fields[5]))
@@ -330,28 +330,38 @@ class FixedTariff(Tariff):
 
 
 class DynamicTariffResult(TicketTariffResult):
-    def __init__(self, tariff, delta, units, extra_time=None):
+    @staticmethod
+    def cycle(lst, skip=0):
+        for i in lst[skip:]:
+            yield i
+        while True:
+            for i in lst:
+                yield i
+
+    def total_price(self, tariff, units, skip=0):
+        cost_per_day = sum(tariff.cost)
+        if tariff.max_per_day is not None:
+            cost_per_day = min(cost_per_day, tariff.max_per_day)
+        base = cost_per_day * (units / 24)
+        base += min(cost_per_day, sum(price for _, price in izip(xrange(units % 24), self.cycle(tariff.cost, skip))))
+        return base
+
+    def __init__(self, tariff, delta, units, extra=None):
         super(DynamicTariffResult, self).__init__()
 
         self.days = delta.days
         self.hours = int(floor(delta.seconds / 3600))
         self.minutes = int(floor((delta.seconds % 3600) / 60))
-        self.units = units
-        if self.units == 0:
-            self.paid_time = delta
-        else:
-            self.paid_time = tariff.paid_time(self.units) + (extra_time if extra_time is not None else timedelta(0))
-
+        self.units = units + (extra[0] if extra is not None else 0)
+        self.paid_time = tariff.paid_time(self.units)
         if self.paid_time < delta:
             self.paid_time = delta
 
-        self.price = sum(price for _, price in izip(xrange(int(units)), cycle(tariff.cost)))
-        if tariff.max_per_day is not None and self.price > tariff.max_per_day:
-            cost_per_day = min(tariff.max_per_day, sum(tariff.cost))
-            self.price = cost_per_day * (self.units / 24)
-            self.price += min(tariff.max_per_day, sum(price for _, price in izip(xrange(int(self.units % 24)),
-                                                                                 cycle(tariff.cost))))
-        self.cost = self.price  # this value will then go to the database
+        self.price = self.total_price(tariff, units)
+        if extra is not None:
+            self.price += self.total_price(tariff, *extra)
+
+        self.cost = self.price  # this value goes to the database
 
 
 @Tariff.register(Tariff.DYNAMIC)
@@ -365,7 +375,22 @@ class DynamicTariff(Tariff):
         if self.interval != Tariff.HOURLY:
             raise ValueError("DynamicTariff can only be hourly.")
 
+    def extra(self, begin, end, pivot):
+        return (
+            self.calc_units(begin, min(end, pivot))[1],
+            24 - int(ceil((pivot - begin).total_seconds() / 3600))
+        ) if all((
+            (end - begin).total_seconds() > self.free_time,
+            (pivot - begin).total_seconds() > self.free_time
+        )) else ()
+
     def calc(self, begin, end):
+        if self.zero_time is not None:
+            pivot = begin.replace(hour=self.zero_time[0], minute=self.zero_time[1], second=0)
+            if pivot < begin:
+                pivot += timedelta(days=1)
+            _, units = self.calc_units(pivot, end)
+            return DynamicTariffResult(self, end - begin, units, self.extra(begin, end, pivot))
         return DynamicTariffResult(self, *self.calc_units(begin, end))
 
 

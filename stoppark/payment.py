@@ -41,7 +41,6 @@ class Payment(QObject):
         When True, all other methods MUST be present and implemented correctly.
         When False, only explanation property is necessary.
         """
-        print 'Default Payment.enabled', self
         return False
 
     @pyqtProperty(int, constant=True)

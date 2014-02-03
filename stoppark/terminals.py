@@ -153,6 +153,7 @@ class Terminals(QWidget):
 
         self.session = None
         self.model = None
+        self.devices = {}
         self.mainloop = None
         self.delegate = None
 
@@ -176,7 +177,6 @@ class Terminals(QWidget):
         if access in ['operator']:
             self.ui.cashier.setText(fio)
             self.session = (fio, access)
-            self.start_mainloop()
             return True
         return False
 
@@ -193,7 +193,7 @@ class Terminals(QWidget):
 
     def start_mainloop(self):
         if self.mainloop is None:
-            self.mainloop = Mainloop(parent=self)
+            self.mainloop = Mainloop(devices=self.devices)
             self.mainloop.ready.connect(self.on_mainloop_ready)
             self.mainloop.stopped.connect(self.on_mainloop_stopped)
             self.mainloop.notify.connect(lambda title, msg: self.notifier.showMessage(title, msg))
@@ -215,6 +215,13 @@ class Terminals(QWidget):
             self.mainloop.stop(block)
         else:
             self.ready.emit(False)
+
+    def reset_mainloop(self, devices):
+        self.devices = devices
+        if self.mainloop is None:
+            self.start_mainloop()
+        else:
+            self.stop_mainloop()
 
     def on_mainloop_ready(self, ok, titles):
         if ok:

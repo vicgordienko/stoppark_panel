@@ -8,9 +8,12 @@ from card import Card
 from tariff import Tariff
 from config import db_filename, DATETIME_FORMAT
 import sqlite3
+from collections import namedtuple
 from i18n import language
-import stoppark
 _ = language.ugettext
+
+
+TerminalData = namedtuple('TerminalData', ['title', 'notify', 'option'])
 
 
 def measure(f):
@@ -35,6 +38,7 @@ class LocalDB(object):
         id integer primary key,
         title text,
         display integer default 1,
+        notify integer default 1,
         option text default ''
     );
 
@@ -232,9 +236,11 @@ class LocalDB(object):
     def update_terminals(self, terminals):
         with self.conn as c:
             c.executemany('insert into terminal_view(id, title) values(?,?)', terminals)
+            c.execute('delete from terminal where id not in (%s)' % (','.join(('?',) * len(terminals)),),
+                      [t[0] for t in terminals])
 
     def get_terminals(self):
-        return self.query('select id,title,option from terminal where display = 1')
+        return self.query('select id,title,notify,option from terminal where display = 1')
 
     def update_tariffs(self, tariffs):
         try:
@@ -323,8 +329,12 @@ class DB(QObject):
         return Ticket.create(self.query('select * from ticket where bar = "%s"' % (bar,)))
 
     def get_terminals(self):
-        return dict((int(key), (value.decode('utf8', errors='replace'), option))
-                    for key, value, option in self.local.get_terminals())
+        return {
+            int(key): TerminalData(title=value.decode('utf8', errors='replace'),
+                                   notify=notify,
+                                   option=option)
+            for key, value, notify, option in self.local.get_terminals()
+        }
 
     def update_terminals(self):
         ret = self.query('select terminal_id,title from terminal')

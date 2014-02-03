@@ -235,10 +235,11 @@ class Executor(QObject):
         message = message.replace('<hr />', '-'*48)
         message = re.sub(self.BARCODE_REPLACE_REGEX, self.barcode_replace, message)
         message += '\n'*6 + '\x1d\x56\x01'
-        while message:
-            printer.send(message[:256])
-            sleep(0.5)
-            message = message[256:]
+        printer.send(message)
+        # while message:
+        #     printer.send(message[:256])
+        #     sleep(0.5)
+        #     message = message[256:]
 
     @async
     def handle_bar(self, bar):

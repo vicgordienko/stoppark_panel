@@ -3,20 +3,29 @@ from gevent import sleep, spawn
 from gevent.queue import Queue
 from interface import Terminal, TerminalEntries, TerminalReaders, TerminalBarcode, TerminalState
 from interface import TerminalCounters, TerminalStrings, TerminalTime, TerminalMessage
+from interface import ReaderError
 from PyQt4.QtCore import QObject, pyqtSignal
 from db import DB
 from threading import Thread
+from i18n import language
+_ = language.ugettext
 
 
-def device_loop(terminal, mainloop, addr):
+def device_loop(terminal, mainloop, addr, data):
     failure = 0
+
+    def notify_mainloop(title, message):
+        return mainloop.notify.emit(title, message)
+
+    notify = notify_mainloop if data.notify else lambda title, msg: None
+
     while True:
         processors = [TerminalEntries(addr), TerminalReaders(addr)]
         if addr % 2:
             processors.append(TerminalBarcode(addr))
 
         for p in processors:
-            failure = 0 if p.process(terminal, mainloop) else (failure + 1)
+            failure = 0 if p.process(terminal, mainloop.db, notify) else (failure + 1)
             s = 4 if failure > 2 else 0.3
             mainloop.state.emit(addr, 'active' if failure <= 2 else 'inactive')
             sleep(s)
@@ -29,37 +38,41 @@ class Mainloop(QObject):
     state = pyqtSignal(int, str)
     notify = pyqtSignal(str, str)
 
-    def __init__(self, parent=None):
+    def __init__(self, devices, parent=None):
         super(Mainloop, self).__init__(parent)
         self.queue = None
         self.thread = None
+        self.devices = devices
         self.db = None
 
     def spawn_device_greenlets(self, terminal, devices):
-        return [spawn(device_loop, terminal, self, addr) for addr in devices]
+        print devices
+        return [spawn(device_loop, terminal, self, addr, data) for addr, data in devices.iteritems()]
+
+    @staticmethod
+    def dummy_greenlet():
+        while True:
+            sleep(1)
 
     def _mainloop(self):
 
-        terminal = Terminal()
-        if not terminal.is_open():
-            self.notify.emit(u'Ошибка', u'Нет связи с концентратором')
+        try:
+            terminal = Terminal(explicit_error=True)
+        except ReaderError:
+            self.notify.emit(_('Terminals error'), _('Cannot connect to concentrator'))
             self.ready.emit(False, {})
+            sleep(5)
+            self.stopped.emit()
             return
 
-        if self.db is None:
-            self.db = DB(notify=lambda title, msg: self.notify.emit(title, msg))
-        titles = self.db.get_terminals()
-        devices = titles.keys()
-
-        if not devices:
-            self.notify.emit(u'Ошибка', u'Нет информации о терминалах')
-            self.ready.emit(False, {})
-            return
+        self.db = DB(notify=lambda title, msg: self.notify.emit(title, msg))
 
         self.queue = Queue()
-        self.ready.emit(True, titles)
+        self.ready.emit(True, self.devices)
 
-        greenlets = self.spawn_device_greenlets(terminal, devices)
+        greenlets = self.spawn_device_greenlets(terminal, self.devices)
+        if not greenlets:
+            greenlets.append(spawn(self.dummy_greenlet))
 
         while True:
             command = self.queue.get()
@@ -85,7 +98,7 @@ class Mainloop(QObject):
                 self.thread.join()
 
     def test_display(self):
-        test_message = u'Тестовое сообщение'
+        test_message = _('Test message')
         self.queue.put(lambda terminal: TerminalMessage(test_message).set(terminal, 0xFF, 5))
 
     def update_config(self, addr=0xFF):

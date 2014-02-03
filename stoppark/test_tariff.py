@@ -136,6 +136,10 @@ class TestFixedTariff(TestCase):
         self.assertEqual(tariff.calc(datetime(2013, 10, 24, 9, 0, 0), datetime(2013, 10, 24, 8, 50, 0)).state(),
                          (-1, 23, 50, 0, timedelta(-1, 85800), 0))
 
+        self.assertEqual(tariff.calc(datetime(2014, 1, 30, 1, 0, 0), datetime(2014, 1, 30, 5, 0, 0)).state(),
+                         (0, 4, 0, 1, timedelta(0, 3600*8), 100))
+
+
     def test_hourly_with_max_per_day(self):
         tariff_a = Tariff.create(['1', 'Hourly + max_per_day', '1', '1', '1', 'None', '100', 'None'])
         self.assertEqual(tariff_a.calc(datetime(2013, 10, 26, 8, 0, 0), datetime(2013, 10, 28, 16, 20, 0)).state(),
@@ -170,3 +174,20 @@ class TestDynamicTariff(TestCase):
         tariff = Tariff.create(['2', '', '2', '1', ' '.join(str(i) for i in range(1, 25)), 'None', '10', 'None'])
         self.assertEqual(tariff.calc(datetime(2013, 10, 26, 8, 0, 0), datetime(2013, 10, 28, 16, 20, 0)).state(),
                          (2, 8, 20, 57, timedelta(2, 32400), 30))
+
+    def test_dynamic_with_zero_time(self):
+        tariff = Tariff.create(['2', '', '2', '1', ' '.join(str(i) for i in range(1, 25)), '00:00', 'None', 'None'])
+        self.assertEqual(tariff.calc(datetime(2014, 01, 29, 8, 21, 0), datetime(2014, 01, 29, 10, 0, 0)).state(),
+                         (0, 1, 39, 2, timedelta(0, 2*3600), 9 + 10))
+
+    def test_dynamic_with_zero_time_and_max_per_day(self):
+        tariff = Tariff.create(['2', '', '2', '1', ' '.join(str(i) for i in range(1, 25)), '00:00', '100', 'None'])
+        self.assertEqual(tariff.calc(datetime(2014, 01, 29, 8, 21, 0), datetime(2014, 01, 29, 10, 0, 0)).state(),
+                         (0, 1, 39, 2, timedelta(0, 2*3600), 9 + 10))
+        self.assertEqual(tariff.calc(datetime(2014, 01, 29, 8, 21, 0), datetime(2014, 01, 30, 10, 0, 0)).state(),
+                         (1, 1, 39, 26, timedelta(1, 2*3600), 100 + 55))
+
+    def test_dynamic_zero_time_24(self):
+        tariff = Tariff.create(['2', '', '2', '1', ' '.join(str(i) for i in range(1, 25)), '24:00', '100', 'None'])
+        self.assertEqual(tariff.calc(datetime(2014, 2, 1, 8, 0, 0), datetime(2014, 2, 1, 10, 0, 0)).state(),
+                         (0, 2, 0, 2, timedelta(0, 2*3600), 1+2))

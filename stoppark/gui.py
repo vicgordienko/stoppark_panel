@@ -125,15 +125,13 @@ class Main(QWidget):
         if terminals is None:
             terminals = {}
         else:
-            self.ui.terminals.stop_mainloop()
+            self.ui.terminals.reset_mainloop(terminals)
 
-        self.left_terminals = [key for key, value in terminals.iteritems() if value[1] == 'left']
-        print self.left_terminals
+        self.left_terminals = [key for key, value in terminals.iteritems() if value.option == 'left']
         self.ui.leftUp.setEnabled(not not self.left_terminals)
         self.ui.leftDown.setEnabled(not not self.left_terminals)
 
-        self.right_terminals = [key for key, value in terminals.iteritems() if value[1] == 'right']
-        print self.right_terminals
+        self.right_terminals = [key for key, value in terminals.iteritems() if value.option == 'right']
         self.ui.rightUp.setEnabled(not not self.right_terminals)
         self.ui.rightDown.setEnabled(not not self.right_terminals)
 

@@ -49,8 +49,9 @@ class CenteredCheckBoxDelegate(QStyledItemDelegate):
 class TerminalSqlTableModel(QSqlTableModel):
     def __init__(self, parent=None, db=None):
         QSqlTableModel.__init__(self, parent, db)
-        self.headers = [_('Addr'), _('Title'), u'', u'']
-        self.font = QFont("Monospace", 18)
+        self.headers = [_('Addr'), _('Title'), u'+', u'!', u'']
+        self.font = QFont("Monospace", 16)
+        self.checkable_columns = [2, 3]
 
     #noinspection PyPep8Naming,PyMethodOverriding
     def headerData(self, col, orientation, role):
@@ -64,23 +65,23 @@ class TerminalSqlTableModel(QSqlTableModel):
     def flags(self, index):
         flags = QSqlTableModel.flags(self, index)
         flags &= ~Qt.ItemIsEditable
-        if index.column() == 2:
+        if index.column() in self.checkable_columns:
             flags |= Qt.ItemIsUserCheckable
         return flags
 
     def set_option(self, row, value):
         print 'set_option', row, value
         for i in range(self.rowCount()):
-            index = self.index(i, 3)
+            index = self.index(i, len(self.headers) - 1)
             if self.data(index, Qt.EditRole).toString() == value:
                 self.dataChanged.emit(self.index(i, 0), index)
                 self.setData(index, '', Qt.EditRole)
 
-        self.dataChanged.emit(self.index(row, 0), self.index(row, 3))
-        return self.setData(self.index(row, 3), value, Qt.EditRole)
+        self.dataChanged.emit(self.index(row, 0), self.index(row, len(self.headers) - 1))
+        return self.setData(self.index(row, len(self.headers) - 1), value, Qt.EditRole)
 
     def get_color_by_option(self, index):
-        option = QSqlTableModel.data(self, self.index(index.row(), 3)).toString()
+        option = QSqlTableModel.data(self, self.index(index.row(), len(self.headers) - 1)).toString()
         if option == 'left':
             return QColor(Qt.darkGreen)
         if option == 'right':
@@ -98,7 +99,7 @@ class TerminalSqlTableModel(QSqlTableModel):
         if role == Qt.BackgroundColorRole:
             return self.get_color_by_option(index)
 
-        if index.column() == 2:
+        if index.column() in self.checkable_columns:
             value = QSqlTableModel.data(self, index, Qt.EditRole).toInt()[0] == 1
             if role == Qt.CheckStateRole:
                 return Qt.Checked if value else Qt.Unchecked
@@ -109,7 +110,7 @@ class TerminalSqlTableModel(QSqlTableModel):
 
     #noinspection PyPep8Naming,PyMethodOverriding
     def setData(self, index, value, role):
-        if index.column() == 2 and role == Qt.CheckStateRole:
+        if index.column() in self.checkable_columns and role == Qt.CheckStateRole:
             return QSqlTableModel.setData(self, index, QVariant('1' if value == Qt.Checked else '0'), Qt.EditRole)
         return QSqlTableModel.setData(self, index, value, role)
 
@@ -128,10 +129,11 @@ class TerminalConfig(QDialog):
         self.model.select()
 
         self.ui.terminals.setModel(self.model)
-        self.ui.terminals.setColumnHidden(3, True)
+        self.ui.terminals.hideColumn(4)
 
         self.delegate = CenteredCheckBoxDelegate(self)
         self.ui.terminals.setItemDelegateForColumn(2, self.delegate)
+        self.ui.terminals.setItemDelegateForColumn(3, self.delegate)
         self.ui.terminals.horizontalHeader().setResizeMode(QHeaderView.Stretch)
 
         self.ui.ok.clicked.connect(self.edit_completed)

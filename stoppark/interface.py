@@ -113,7 +113,7 @@ class TerminalEntries(Structure):
             'reason': TerminalState.reverse_reasons.get(self.status_reason, None)
         })
 
-    def process(self, terminal, mainloop, reset=True):
+    def process(self, terminal, db, notify, reset=True):
         """
         This method executes terminal_get_entries command and processes its result.
         Result processing includes:
@@ -130,26 +130,26 @@ class TerminalEntries(Structure):
             TerminalTime().set(terminal, self.addr)
 
         if not self.stp_mes:
-            TerminalStrings(mainloop.db).set(terminal, self.addr)
+            TerminalStrings(db).set(terminal, self.addr)
 
         #if self.stp_paper_near:
         #    mainloop.notify.emit(_('Notification'), _('Paper near at terminal %i') % (self.addr,))
 
         if self.stp_paper_no:
-            mainloop.notify.emit(_('Notification'), _('No paper at terminal %i') % (self.addr,))
+            notify(_('Notification'), _('No paper at terminal %i') % (self.addr,))
 
         free_places_diff = self.out_count - self.in_count
         if free_places_diff:
-            mainloop.db.update_free_places(free_places_diff)
-            TerminalCounters(mainloop.db).set(terminal, 0xFF)
+            db.update_free_places(free_places_diff)
+            TerminalCounters(db).set(terminal, 0xFF)
         elif not self.stp_places:
-            TerminalCounters(mainloop.db).set(terminal, self.addr)
+            TerminalCounters(db).set(terminal, self.addr)
 
         for i in range(self.out_count):
-            mainloop.db.generate_pass_event(self.addr, inside=False)
+            db.generate_pass_event(self.addr, inside=False)
 
         for i in range(self.in_count):
-            mainloop.db.generate_pass_event(self.addr, inside=True)
+            db.generate_pass_event(self.addr, inside=True)
 
         return True
 
@@ -216,29 +216,29 @@ class TerminalReader(DumpableStructure):
 
     TIMEOUT = 30
 
-    def process(self, terminal, addr, direction, mainloop):
+    def process(self, terminal, addr, direction, db, notify):
         if self.status == self.CARD_READ and self.time < self.TIMEOUT:
-            card = mainloop.db.get_card(self.sn)
+            card = db.get_card(self.sn)
             card_info = card.fio if card else _('Unknown card')
-            mainloop.notify.emit(_('Card at terminal'), u'%s' % (card_info,))
+            notify(_('Card at terminal'), u'%s' % (card_info,))
             if card and card.check(direction):
-                mainloop.notify.emit(_('Access permitted.'), u'%s' % (card_info,))
+                notify(_('Access permitted.'), u'%s' % (card_info,))
                 command = 'out_open' if direction else 'in_open'
-                TerminalState('auto', command).set(terminal, addr, mainloop.db)
+                TerminalState('auto', command).set(terminal, addr, db)
                 TerminalMessage(_('Access permitted.')).set(terminal, addr)
             else:
-                mainloop.notify.emit(_('Access denied.'), u'%s' % (card_info,))
+                notify(_('Access denied.'), u'%s' % (card_info,))
                 TerminalMessage(_('Access denied.')).set(terminal, addr)
         if self.status == self.CARD_IN:
-            card = mainloop.db.get_card(self.sn)
+            card = db.get_card(self.sn)
             if card:
-                mainloop.notify.emit(_('Car inside'), u'%s' % (card.fio,))
-                card.moved(mainloop.db, addr, inside=True)
+                notify(_('Car inside'), u'%s' % (card.fio,))
+                card.moved(db, addr, inside=True)
         if self.status == self.CARD_OUT:
-            card = mainloop.db.get_card(self.sn)
+            card = db.get_card(self.sn)
             if card:
-                mainloop.notify.emit(_('Car outside'), u'%s' % (card.fio,))
-                card.moved(mainloop.db, addr, inside=False)
+                notify(_('Car outside'), u'%s' % (card.fio,))
+                card.moved(db, addr, inside=False)
 
 
 class TerminalReaders(Structure):
@@ -254,7 +254,7 @@ class TerminalReaders(Structure):
     def __str__(self):
         return str(self.reader_out) if self.addr % 2 else str(self.reader_in)
 
-    def process(self, terminal, mainloop):
+    def process(self, terminal, db, notify):
         ret = terminal_get_readers(terminal, self.addr, self)
 
         direction = self.addr % 2  # direction is 0 for moving in and 1 for moving out
@@ -264,7 +264,7 @@ class TerminalReaders(Structure):
         terminal_ack_readers(terminal, self.addr)
 
         handler = self.reader_out if direction else self.reader_in
-        handler.process(terminal, self.addr, direction, mainloop)
+        handler.process(terminal, self.addr, direction, db, notify)
 
         return True
 
@@ -287,26 +287,26 @@ class TerminalBarcode(DumpableStructure):
     def __init__(self, addr):
         self.addr = addr
 
-    def process(self, terminal, mainloop):
+    def process(self, terminal, db, notify):
         ret = terminal_get_barcode(terminal, self.addr, self)
         if ret != 0 and ret != 0xe0214de:
             return False
 
         if self.status == self.BAR_READ and self.time < self.TIMEOUT:
-            ticket = mainloop.db.get_ticket(self.code)
+            ticket = db.get_ticket(self.code)
             if ticket and ticket.check():
-                mainloop.notify.emit(_('BAR Access permitted.'), u'%s' % (ticket.bar,))
-                TerminalState('auto', 'out_open').set(terminal, self.addr, mainloop.db)
+                notify(_('BAR Access permitted.'), u'%s' % (ticket.bar,))
+                TerminalState('auto', 'out_open').set(terminal, self.addr, db)
                 TerminalMessage(_('BAR Access permitted.')).set(terminal, self.addr)
             else:
-                mainloop.notify.emit(_('BAR Access denied.'), u'%s' % (ticket.bar,))
+                notify(_('BAR Access denied.'), u'%s' % (ticket.bar,))
                 TerminalMessage(_('BAR Access denied.')).set(terminal, self.addr)
 
         if self.status == self.BAR_LEFT and self.time < self.LEAVE_TIMEOUT:
-            ticket = mainloop.db.get_ticket(self.code)
+            ticket = db.get_ticket(self.code)
             if ticket and ticket.check():
-                mainloop.notify.emit(_('BAR Left'), u'%s' % (ticket.bar,))
-                ticket.out(mainloop.db)
+                notify(_('BAR Left'), u'%s' % (ticket.bar,))
+                ticket.out(db)
 
         return True
 

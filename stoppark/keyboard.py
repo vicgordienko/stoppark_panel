@@ -12,6 +12,8 @@ class Keyboard(object):
 
     @classmethod
     def show(cls, layout=None):
+        if sys.platform == 'win32':
+            return
         if cls.keyboard is not None:
             if cls.keyboard.poll() is None:
                 return
@@ -41,8 +43,8 @@ class TicketInput(QDialog):
         self.ui.keyboard.clicked.connect(self.show_keyboard)
         self.ui.bar.textChanged.connect(self.bar_changed)
 
-        self.show_keyboard()
         self.ui.bar.setFocus(True)
+        self.show_keyboard()
 
     def localize(self):
         self.setWindowTitle(_('Manual barcode input'))
