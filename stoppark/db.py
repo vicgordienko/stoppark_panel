@@ -179,6 +179,7 @@ class LocalDB(object):
             self.set_option('db.ip', '127.0.0.1')
 
     def set_option(self, key, value):
+        print 'set_option', key, value
         with self.conn as c:
             cursor = c.cursor()
             cursor.execute('update opt set value=? where key=?', (value, key))

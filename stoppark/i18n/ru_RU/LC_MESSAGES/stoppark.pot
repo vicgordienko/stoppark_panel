@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Stoppark-1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2014-01-29 17:03+0200\n"
-"PO-Revision-Date: 2014-01-29 17:04+0200\n"
+"POT-Creation-Date: 2014-02-11 14:41+0200\n"
+"PO-Revision-Date: 2014-02-11 14:55+0200\n"
 "Last-Translator: Feanor <std.feanor@gmail.com>\n"
 "Language-Team: stdk <http://github.com/stdk>\n"
 "Language: ru_RU\n"
@@ -34,11 +34,11 @@ msgstr ""
 "[%(make)s] [%(number)s] [%(status)s]\n"
 "Действительна с %(begin)s по %(end)s\n"
 
-#: card.py:41 db.py:386 report.py:30
+#: card.py:41 db.py:396 report.py:30
 msgid "inside"
 msgstr "внутри"
 
-#: card.py:42 db.py:386 report.py:35 report.py:40
+#: card.py:42 db.py:396 report.py:35 report.py:40
 msgid "outside"
 msgstr "снаружи"
 
@@ -60,7 +60,7 @@ msgstr "Невозможно пополнить по этому тарифу."
 msgid "%(begin)s - %(end)s"
 msgstr "%(begin)s - %(end)s"
 
-#: card.py:63 once_payable.py:32 payment.py:60
+#: card.py:63 once_payable.py:32 payment.py:59
 #, python-format
 msgid "Price: $%i"
 msgstr "Оплата: %i грн."
@@ -100,106 +100,110 @@ msgstr ""
 "Карточка %(sn)s\n"
 "%(fio)s\n"
 
-#: config_ui.py:48
+#: config_ui.py:50
 msgid "General"
 msgstr "Общее"
 
-#: config_ui.py:49 gui.py:46
+#: config_ui.py:51 gui.py:49
 msgid "Terminals"
 msgstr "Терминалы"
 
-#: config_ui.py:50 gui.py:47
+#: config_ui.py:52 gui.py:50
 msgid "Payments"
 msgstr "Оплата"
 
-#: config_ui.py:52
+#: config_ui.py:54
 msgid "Version:"
 msgstr "Версия:"
 
-#: config_ui.py:54
+#: config_ui.py:56
 msgid "Date and time:"
 msgstr "Дата и время:"
 
-#: config_ui.py:55 config_ui.py:58 config_ui.py:69
+#: config_ui.py:57 config_ui.py:60 config_ui.py:71
 msgid "Setup"
 msgstr "Установить"
 
-#: config_ui.py:57
+#: config_ui.py:59
 msgid "DB server IP:"
 msgstr "Адрес сервера БД:"
 
-#: config_ui.py:60
+#: config_ui.py:62
 msgid "Network connection:"
 msgstr "Подключение к сети:"
 
-#: config_ui.py:61
+#: config_ui.py:63
 msgid "Setup network connection"
 msgstr "Настроить сетевое подключение"
 
-#: config_ui.py:63
+#: config_ui.py:65
 msgid "Terminal list"
 msgstr "Список терминалов"
 
-#: config_ui.py:64
+#: config_ui.py:66
 msgid "Configure and update terminal list:"
 msgstr "Выполнить настройку и обновление списка терминалов:"
 
-#: config_ui.py:65
+#: config_ui.py:67
 msgid "Configure"
 msgstr "Настроить"
 
-#: config_ui.py:66
+#: config_ui.py:68
 msgid "Update"
 msgstr "Обновить"
 
-#: config_ui.py:67
+#: config_ui.py:69
 msgid "Terminal setup"
 msgstr "Конфигурация терминалов"
 
-#: config_ui.py:68
+#: config_ui.py:70
 msgid "Perform global terminal setup:"
 msgstr "Выполнить установку параметров для всех терминалов в системе:"
 
-#: config_ui.py:70
+#: config_ui.py:72
 msgid "Tests"
 msgstr "Тесты"
 
-#: config_ui.py:71
+#: config_ui.py:73
 msgid "Display test:"
 msgstr "Выполнить тест дисплея:"
 
-#: config_ui.py:72
+#: config_ui.py:74
 msgid "Test display"
 msgstr "Тест дисплея"
 
-#: config_ui.py:73
+#: config_ui.py:75
 msgid "Antipassback"
 msgstr "Антипассбек"
 
-#: config_ui.py:74
+#: config_ui.py:76 config_ui.py:79
 msgid "Enable"
 msgstr "Активировать"
 
-#: config_ui.py:128 config_ui.py:132
+#: config_ui.py:78
+msgid "Manual ticket print"
+msgstr "Режим ручной печати баркода"
+
+#: config_ui.py:133 config_ui.py:137
 #, python-format
 msgid "Update: %s"
 msgstr "Обновлено: %s"
 
-#: config_ui.py:142
+#: config_ui.py:147
 msgid "successful"
 msgstr "успешно"
 
-#: config_ui.py:142
+#: config_ui.py:147
 msgid "unsuccessful"
 msgstr "не удалось"
 
-#: config_ui.py:144
+#: config_ui.py:149
 #, python-format
 msgid "Update: %(message)s (%(now)s)"
 msgstr "Обновление: %(message)s (%(now)s)"
 
 # Значения конфигурационных строк по умолчанию
-#: db.py:164
+#: db.py:168
 msgid ""
 "CARD-SYSTEMS\n"
 "Kyiv\n"
@@ -219,31 +223,31 @@ msgstr ""
 "ЗА ВТРАТУ ТАЛОНУ ШТРАФ\n"
 "ЗРАЗОК"
 
-#: db.py:307
+#: db.py:313
 msgid "Database Error"
 msgstr "Нет связи с базой данных"
 
-#: db.py:311
+#: db.py:317
 msgid "Query Error"
 msgstr "Ошибка запроса к базе данных"
 
-#: db.py:365
+#: db.py:375
 msgid "manual"
 msgstr "вручную"
 
-#: db.py:366
+#: db.py:376
 msgid "auto"
 msgstr "автоматически"
 
-#: db.py:375
+#: db.py:385
 msgid "open"
 msgstr "открытие"
 
-#: db.py:383 report.py:31 report.py:36 report.py:41
+#: db.py:393 report.py:31 report.py:36 report.py:41
 msgid "pass"
 msgstr "проезд"
 
-#: db.py:405
+#: db.py:415
 msgid ""
 "Automatic system\n"
 "of payed parking\n"
@@ -256,22 +260,22 @@ msgstr ""
 "<hr />\n"
 
 # Формат даты для вывода на пользовательский дисплей
-#: executor.py:102
+#: executor.py:104
 #, python-format
 msgid "%x"
 msgstr "%x"
 
 # Формат времени для вывода на пользовательский дисплей
-#: executor.py:103
+#: executor.py:105
 #, python-format
 msgid "%X"
 msgstr "%X"
 
-#: gui.py:45
+#: gui.py:48
 msgid "Stop-Park"
 msgstr "Стоп-Парк"
 
-#: gui.py:48 login.py:10
+#: gui.py:51 login.py:10
 msgid "Config"
 msgstr "Настройки"
 
@@ -320,19 +324,19 @@ msgstr "Доступ запрещен."
 msgid "BAR Left"
 msgstr "Выезд по талону"
 
-#: keyboard.py:48
+#: keyboard.py:50
 msgid "Manual barcode input"
 msgstr "Ручной ввод баркода"
 
-#: keyboard.py:49
+#: keyboard.py:51
 msgid "Input barcode"
 msgstr "Введите баркод"
 
-#: keyboard.py:50 terminal_config.py:144
+#: keyboard.py:52 terminal_config.py:146
 msgid "OK"
 msgstr "ОК"
 
-#: keyboard.py:51 payments.py:46 terminal_config.py:145
+#: keyboard.py:53 payments.py:45 terminal_config.py:147
 msgid "Cancel"
 msgstr "Отмена"
 
@@ -406,6 +410,18 @@ msgstr ""
 "\n"
 "%(report)s"
 
+#: mainloop.py:62
+msgid "Terminals error"
+msgstr "Нет связи с терминалами"
+
+#: mainloop.py:62
+msgid "Cannot connect to concentrator"
+msgstr "Нет связи с концентратором"
+
+#: mainloop.py:101
+msgid "Test message"
+msgstr "Тестовое сообщение"
+
 #: once_payable.py:27 once_payable.py:31
 msgid "Single payment"
 msgstr "Разовая оплата"
@@ -422,7 +438,7 @@ msgstr ""
 "%(tariff)s: %(price)s грн.\n"
 "<hr />"
 
-#: payment.py:94
+#: payment.py:93 ticket.py:380
 msgid ""
 "<c><b>P A R K I N G  T I C K E T</b></c>\n"
 "\n"
@@ -430,19 +446,23 @@ msgstr ""
 "<c><b>П А Р К У В А Л Ь Н И Й  Т А Л О Н</b></c>\n"
 "\n"
 
-#: payments.py:42
-msgid "Waiting for operator card..."
-msgstr "Поднесите карточку оператора"
-
-#: payments.py:45
+#: payments.py:44
 msgid "Pay"
 msgstr "Оплатить"
 
-#: payments.py:136
+#: payments.py:50
+msgid "No tariffs to display"
+msgstr "Тарифы отсутствуют"
+
+#: payments.py:61
+msgid "Waiting for operator card..."
+msgstr "Поднесите карточку оператора"
+
+#: payments.py:137
 msgid "Payment"
 msgstr "Оплата"
 
-#: payments.py:136
+#: payments.py:137
 msgid "Payment has been successful"
 msgstr "Оплата выполнена успешно"
 
@@ -598,7 +618,7 @@ msgstr ""
 "Длительность парковки: %(duration)s.\n"
 "Единиц оплаты: %(units)i"
 
-#: tariff.py:395
+#: tariff.py:420
 #, python-format
 msgid "After refill: from %(begin)s to %(end)s"
 msgstr "После пополнения: с %(begin)s по %(end)s"
@@ -611,7 +631,7 @@ msgstr "Адрес"
 msgid "Title"
 msgstr "Наименование"
 
-#: terminal_config.py:143
+#: terminal_config.py:145
 msgid "Terminal config"
 msgstr "Настройка терминалов"
 
@@ -718,6 +738,19 @@ msgstr "Талон уже %s выехал."
 #, python-format
 msgid "Ticket %s payment undefined."
 msgstr "Оплата по талону %s не определена."
+
+#: ticket.py:381
+#, python-format
+msgid ""
+"Moved inside: %s\n"
+"<hr />\n"
+msgstr "В'їзд: %s\n"
+
+#, fuzzy
+#~ msgid "<c><b>P A R K I N G  T I C K E T</b></c>\n"
+#~ msgstr ""
+#~ "<c><b>П А Р К У В А Л Ь Н И Й  Т А Л О Н</b></c>\n"
+#~ "\n"
 
 #~ msgid "Current time"
 #~ msgstr "Сейчас"

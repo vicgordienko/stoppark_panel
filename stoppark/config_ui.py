@@ -43,6 +43,8 @@ class Config(QWidget):
         self.ui.setupNetworkConnection.clicked.connect(self.setup_network_connection)
 
         self.ui.apbState.stateChanged.connect(lambda state: self.option_changed.emit('apb', str(state)))
+        self.ui.manualTicketPrint.stateChanged.connect(lambda state: self.option_changed.emit('ticket.manual_print',
+                                                                                              str(state)))
 
     def localize(self):
         self.ui.tabs.setTabText(0, _('General'))
@@ -73,6 +75,9 @@ class Config(QWidget):
         self.ui.apbTitle.setText(_('Antipassback'))
         self.ui.apbState.setText(_('Enable'))
 
+        self.ui.manualTicketPrintTitle.setText(_('Manual ticket print'))
+        self.ui.manualTicketPrint.setText(_('Enable'))
+
     def begin_session(self, fio, access):
         if access in ['admin', 'operator']:
             [self.ui.tabs.setTabEnabled(i, True) for i in [0, 1, 2]]
@@ -100,12 +105,15 @@ class Config(QWidget):
         self.ui.setDBIP.clicked.connect(self.set_db_ip)
         self.ui.testDisplay.clicked.connect(self.test_display)
 
-    def set_option(self, key, value):
-        print 'set_option', key, value
-        if key == 'db.ip':
-            self.ui.dbIP.setText(value)
-        if key == 'apb':
-            self.ui.apbState.setCheckState(int(value))
+    def handle_option(self, key, value):
+        handler = {
+            'db.ip': lambda v: self.ui.dbIP.setText(v),
+            'apb': lambda v: self.ui.apbState.setCheckState(int(v)),
+            'ticket.manual_print': lambda v: self.ui.manualTicketPrint.setCheckState(int(v))
+        }.get(str(key), None)
+        if handler:
+            print 'found handler for ', key
+            handler(value)
 
     def get_time(self):
         from PyQt4.QtCore import QTime, QDate

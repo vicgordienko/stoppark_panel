@@ -1,6 +1,6 @@
 # coding=utf-8
 from PyQt4.QtCore import QObject, pyqtProperty, pyqtSlot
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import DATETIME_FORMAT, DATETIME_FORMAT_FULL, DATETIME_FORMAT_USER
 from tariff import Tariff
 from payment import Payment
@@ -246,6 +246,24 @@ class Ticket(QObject):
         except (TypeError, AssertionError, IndexError, ValueError):
             return None
 
+    BAR_FORMAT = '%m%d%H%M%S'
+    BAR_PARSE_FORMAT = '%Y' + BAR_FORMAT
+
+    @staticmethod
+    def bar_checksum(bar):
+        return sum(ord(i) - ord('0') for i in bar[:-2]) & 0xFF
+
+    @staticmethod
+    def new_bar(when):
+        """
+        >>> Ticket.new_bar(datetime(2014, 2, 7, 12, 0, 0))
+        '020712000000000012'
+        >>> Ticket.new_bar(datetime(2013, 1, 2, 3, 4, 5))
+        '010203040500000015'
+        """
+        bar = when.strftime(Ticket.BAR_FORMAT) + '0'*8
+        return bar[:-2] + str(Ticket.bar_checksum(bar)).rjust(2, '0')
+
     @staticmethod
     def parse_bar(bar):
         """
@@ -255,18 +273,25 @@ class Ticket(QObject):
         again with previous year.
         @param bar: string, barcode from barcode reader
         @return: datetime.datetime, datetime of ticket moving inside
+
+        NOTE: due to the lack of year information in ticket barcode, there is no way
+        to provide a reliable doctest without relying on datetime.now()
+        >>> ticket_in = datetime.now()
+        >>> ticket_in -= timedelta(days=1, seconds=1800, microseconds=ticket_in.microsecond)
+        >>> Ticket.parse_bar(Ticket.new_bar(ticket_in)) == ticket_in
+        True
         """
         if len(bar) != Ticket.BAR_LENGTH:
             raise ValueError
-        if sum(ord(i) - ord('0') for i in bar[:-2]) & 0xFF != int(bar[-2:]):
+        if Ticket.bar_checksum(bar) != int(bar[-2:]):
             raise ValueError
         try:
-            probable_date = datetime.strptime(str(datetime.now().year) + bar[:10], '%Y%m%d%H%M%S')
+            probable_date = datetime.strptime(str(datetime.now().year) + bar[:10], Ticket.BAR_PARSE_FORMAT)
             if probable_date > datetime.now():
                 raise ValueError
             return probable_date
         except ValueError:
-            return datetime.strptime(str(datetime.now().year - 1) + bar[:10], '%Y%m%d%H%M%S')
+            return datetime.strptime(str(datetime.now().year - 1) + bar[:10], Ticket.BAR_PARSE_FORMAT)
 
     @staticmethod
     def register(db, bar):
@@ -350,8 +375,15 @@ class Ticket(QObject):
                 elif self.time_excess_paid and (now - self.time_excess_paid).total_seconds() < self.EXCESS_INTERVAL:
                     return True
 
+    def to_string_check(self, db):
+        return db.get_check_header() + u''.join((
+            _('<c><b>P A R K I N G  T I C K E T</b></c>\n\n'),
+            _('Moved inside: %s') % (datetime.now().strftime(DATETIME_FORMAT_USER),),
+            u'\n<hr />\n',
+            u'<<%s>>' % (self.bar,),
+        ))
+
 
 if __name__ == '__main__':
     import doctest
-
     doctest.testmod()

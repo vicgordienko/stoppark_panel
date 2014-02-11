@@ -4,6 +4,8 @@ from PyQt4.QtGui import QWidget, QApplication, QIcon, QSystemTrayIcon, QDialog
 from executor import Executor
 from login import LoginDialog, LogoffDialog
 from db import Card
+from ticket import Ticket
+from datetime import datetime
 from i18n import language
 _ = language.ugettext
 
@@ -29,6 +31,7 @@ class Main(QWidget):
         self.ui.leftDown.clicked.connect(self.left_down)
         self.ui.rightUp.clicked.connect(self.right_up)
         self.ui.rightDown.clicked.connect(self.right_down)
+        self.ui.printTicket.clicked.connect(self.print_ticket)
 
         self.end_session()
 
@@ -71,7 +74,7 @@ class Main(QWidget):
         executor.session_begin.connect(self.begin_session)
         executor.session_end.connect(self.end_session)
 
-        executor.option_notification.connect(self.ui.config.set_option)
+        executor.option_notification.connect(self.handle_option)
         self.ui.config.option_changed.connect(executor.set_option)
 
         self.ui.config.terminals_changed.connect(executor.notify_terminals)
@@ -121,6 +124,12 @@ class Main(QWidget):
                 self.ui.tabs.setCurrentIndex(tab_index)
         self.update_terminals()
 
+    def handle_option(self, key, value):
+        print 'handle_option', key, value
+        if key == 'ticket.manual_print':
+            self.ui.printTicket.setEnabled(value == '2')
+        self.ui.config.handle_option(key, value)
+
     def update_terminals(self, terminals=None):
         if terminals is None:
             terminals = {}
@@ -150,6 +159,9 @@ class Main(QWidget):
     def right_down(self):
         for addr in self.right_terminals:
             self.ui.terminals.terminal_close(addr)
+
+    def print_ticket(self):
+        self.executor.handle_bar(Ticket.new_bar(datetime.now()), emit=False, to_printer=True)
 
     #noinspection PyPep8Naming
     def closeEvent(self, event):

@@ -39,7 +39,6 @@ class Payments(QWidget):
         self.ui.tariffs.setSource(QUrl('view.qml'))
         self.ui.tariffs.setResizeMode(QDeclarativeView.SizeRootObjectToView)
         self.ui.tariffs.rootObject().new_payment.connect(self.handle_payment)
-        self.ui.tariffs.rootObject().set_message(_('Waiting for operator card...'))
 
     def localize(self):
         self.ui.pay.setText(_('Pay'))
@@ -48,6 +47,7 @@ class Payments(QWidget):
     def begin_session(self, fio, access):
         if access in ['operator']:
             self.tariff_update_requested.emit()
+            self.ui.tariffs.rootObject().set_message(_('No tariffs to display'))
             return True
         return False
 
@@ -58,6 +58,7 @@ class Payments(QWidget):
         self.ui.keyboard.setEnabled(False)
         self.ui.cancel.setEnabled(False)
         self.update_tariffs(None)
+        self.ui.tariffs.rootObject().set_message(_('Waiting for operator card...'))
         return False
 
     def manual_ticket_input(self):

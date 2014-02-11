@@ -144,7 +144,7 @@ Rectangle {
                 State {
                     name: "Details"
                     when: index == list.currentIndex
-                    PropertyChanges { target: rect; color: "lightsteelblue" }
+                    PropertyChanges { target: rect; color: "#FFFF80" }
                     PropertyChanges { target: rect; height: list.height }
                     PropertyChanges { target: rect; detailsOpacity: 1 }
                     StateChangeScript {

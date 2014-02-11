@@ -61,7 +61,7 @@ class Mainloop(QObject):
         except ReaderError:
             self.notify.emit(_('Terminals error'), _('Cannot connect to concentrator'))
             self.ready.emit(False, {})
-            sleep(5)
+            sleep(10)
             self.stopped.emit()
             return
 

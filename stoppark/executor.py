@@ -19,7 +19,7 @@ class TicketReader(object):
         self.new_payable = new_payable
         self.ticket = None
 
-    def handle_bar(self, bar, db):
+    def handle_bar(self, bar, db, emit):
         print 'handle_bar', bar
         self.ticket = db.get_ticket(bar)
         if self.ticket is None:
@@ -27,7 +27,9 @@ class TicketReader(object):
             if Ticket.register(db, str(bar)):
                 self.ticket = db.get_ticket(bar)
         if self.ticket:
-            self.new_payable.emit(self.ticket, db.get_tariffs())
+            if emit:
+                self.new_payable.emit(self.ticket, db.get_tariffs())
+            return self.ticket
 
     def __call__(self, db):
         sock = SafeSocket(self.peer)
@@ -242,8 +244,10 @@ class Executor(QObject):
         #     message = message[256:]
 
     @async
-    def handle_bar(self, bar):
-        self.ticket_reader.handle_bar(bar, self.db)
+    def handle_bar(self, bar, emit=True, to_printer=False):
+        ticket = self.ticket_reader.handle_bar(bar, self.db, emit=emit)
+        if to_printer:
+            self.to_printer(ticket.to_string_check(self.db))
 
     @async
     def update_tariffs(self):
